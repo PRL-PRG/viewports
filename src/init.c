@@ -24,12 +24,7 @@ void attribute_visible R_init_viewports(DllInfo *dll) {
     init_slice_altrep_class(dll);
     init_mosaic_altrep_class(dll);
     init_prism_altrep_class(dll);
-
-    //R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
-    //R_useDynamicSymbols(dll, FALSE);
-    //R_forceSymbols(dll, TRUE);
 }
 
 void attribute_visible R_unload_viewports(DllInfo *dll) {
-    printf("goodnight sweet prince\n");
 }

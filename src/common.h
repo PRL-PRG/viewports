@@ -13,6 +13,7 @@ typedef enum {
 
 viewport_type_t recommend_vieport_type_for_indices(SEXP/*INTSXP | REALSXP*/ indices);
 
+bool are_indices_in_range  (SEXP/*INTSXP | REALSXP*/ indices, R_xlen_t min, R_xlen_t max);
 bool are_indices_contiguous(SEXP/*INTSXP | REALSXP*/ indices);
 bool are_indices_monotonic (SEXP/*INTSXP | REALSXP*/ indices);
 bool do_indices_contain_NAs(SEXP/*INTSXP | REALSXP*/ indices);

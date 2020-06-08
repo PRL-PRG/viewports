@@ -7,7 +7,6 @@
 #include <R.h>
 #include <Rinternals.h>
 #include <R_ext/Altrep.h>
-#include <R_ext/Rallocators.h>
 
 #include "debug.h"
 #include "helpers.h"
@@ -15,7 +14,27 @@
 #include "slices.h"
 #include "common.h"
 
-static R_altrep_class_t slice_altrep;
+#ifndef NA_RAW
+#define NA_RAW 0
+#endif
+
+static R_altrep_class_t slice_integer_altrep;
+static R_altrep_class_t slice_numeric_altrep;
+static R_altrep_class_t slice_logical_altrep;
+static R_altrep_class_t slice_complex_altrep;
+static R_altrep_class_t slice_raw_altrep;
+//static R_altrep_class_t slice_vector_altrep;
+
+static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) {
+    switch (type) {
+        case INTSXP:  return slice_integer_altrep;
+        case REALSXP: return slice_numeric_altrep;
+        case LGLSXP:  return slice_logical_altrep;
+        case CPLXSXP: return slice_complex_altrep;
+        case RAWSXP:  return slice_raw_altrep;
+        default:      Rf_error("No ALTREP slice class for vector of type %s", type2str(type));
+    }
+}
 
 # define how_many_ints_in_R_xlen_t (sizeof(R_xlen_t) / sizeof(int))
 typedef union {
@@ -47,7 +66,8 @@ SEXP slice_new(SEXP source, R_xlen_t start, R_xlen_t size) {
         || TYPEOF(source) == VECSXP
         || TYPEOF(source) == STRSXP);
 
-                   // FIXME check vector size vs start and end
+    assert(start < XLENGTH(source));
+    assert(start + size <= XLENGTH(source));
 
     if (get_debug_mode()) {
         Rprintf("slice_new\n");
@@ -74,7 +94,7 @@ SEXP slice_new(SEXP source, R_xlen_t start, R_xlen_t size) {
     SET_TAG(data, R_NilValue); // Starts as R_NilValue, becomes a vector if it the slice is written to
     SETCDR (data, R_NilValue); // Nothing here
 
-    return R_new_altrep(slice_altrep, window, data);
+    return R_new_altrep(class_from_sexp_type(TYPEOF(source)), window, data);
 }
 
 static inline SEXP/*INTSXP*/ get_window(SEXP x) {
@@ -129,7 +149,7 @@ SEXP slice_duplicate(SEXP x, Rboolean deep) {
         SEXP data = is_materialized(x) ? get_materialized_data(x) : R_NilValue;
         SET_TAG(meta, data);       // Starts as R_NilValue, becomes a vector if it the slice is written to
         SETCDR (meta, R_NilValue); // Nothing here
-        return R_new_altrep(slice_altrep, window, meta);
+        return R_new_altrep(class_from_sexp_type(TYPEOF(x)), window, meta);
     }
 }
 
@@ -263,12 +283,25 @@ R_xlen_t project_index(SEXP/*INTSXP*/ window, R_xlen_t index) {
     return projected_index;
 }
 
+static inline bool index_within_bounds(SEXP window, R_xlen_t index) {
+    R_xlen_t start = 0;
+    R_xlen_t size  = 0;
+    read_start_and_size(window, &start, &size);
+    return index < size;
+}
+
 static int slice_integer_element(SEXP x, R_xlen_t i) {
     assert(x != R_NilValue);
+
+    SEXP/*INTSXP*/ window = get_window(x);
+    SEXP/*INTSXP*/ source = get_source(x);
+
+    assert(TYPEOF(source) == INTSXP);
 
     if (get_debug_mode()) {
         Rprintf("slice_integer_element\n");
         Rprintf("           SEXP: %p\n", x);
+        Rprintf("          source: %p\n", source);
         Rprintf("          index: %li\n", i);
         Rprintf("is_materialized: %i\n", is_materialized(x));
     }
@@ -279,10 +312,9 @@ static int slice_integer_element(SEXP x, R_xlen_t i) {
         return INTEGER_ELT(data, i);
     }
 
-    SEXP/*INTSXP*/ window = get_window(x);
-    SEXP/*INTSXP*/ source = get_source(x);
-
-    assert(TYPEOF(source) == INTSXP);
+    if (!index_within_bounds(window, i)) {
+        return NA_INTEGER;
+    }
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -292,9 +324,15 @@ static int slice_integer_element(SEXP x, R_xlen_t i) {
 static double slice_numeric_element(SEXP x, R_xlen_t i) {
     assert(x != R_NilValue);
 
+    SEXP/*INTSXP*/  window = get_window(x);
+    SEXP/*CPLXSXP*/ source = get_source(x);
+
+    assert(TYPEOF(source) == REALSXP);
+
     if (get_debug_mode()) {
         Rprintf("slice_numeric_element\n");
         Rprintf("           SEXP: %p\n", x);
+        Rprintf("          source: %p\n", source);
         Rprintf("          index: %li\n", i);
         Rprintf("is_materialized: %i\n", is_materialized(x));
     }
@@ -305,10 +343,9 @@ static double slice_numeric_element(SEXP x, R_xlen_t i) {
         return REAL_ELT(data, i);
     }
 
-    SEXP/*INTSXP*/  window = get_window(x);
-    SEXP/*REALSXP*/ source = get_source(x);
-
-    assert(TYPEOF(source) == REALSXP);
+    if (!index_within_bounds(window, i)) {
+        return NA_REAL;
+    }
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -318,9 +355,15 @@ static double slice_numeric_element(SEXP x, R_xlen_t i) {
 static Rbyte slice_raw_element(SEXP x, R_xlen_t i) {
     assert(x != R_NilValue);
 
+    SEXP/*INTSXP*/  window = get_window(x);
+    SEXP/*CPLXSXP*/ source = get_source(x);
+
+    assert(TYPEOF(source) == RAWSXP);
+
     if (get_debug_mode()) {
         Rprintf("slice_raw_element\n");
         Rprintf("           SEXP: %p\n", x);
+        Rprintf("          source: %p\n", source);
         Rprintf("          index: %li\n", i);
         Rprintf("is_materialized: %i\n", is_materialized(x));
     }
@@ -331,10 +374,9 @@ static Rbyte slice_raw_element(SEXP x, R_xlen_t i) {
         return RAW_ELT(data, i);
     }
 
-    SEXP/*INTSXP*/ window = get_window(x);
-    SEXP/*RAWSXP*/ source = get_source(x);
-
-    assert(TYPEOF(source) == RAWSXP);
+    if (!index_within_bounds(window, i)) {
+        return NA_RAW;
+    }
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -344,9 +386,15 @@ static Rbyte slice_raw_element(SEXP x, R_xlen_t i) {
 static Rcomplex slice_complex_element(SEXP x, R_xlen_t i) {
     assert(x != R_NilValue);
 
+    SEXP/*INTSXP*/  window = get_window(x);
+    SEXP/*CPLXSXP*/ source = get_source(x);
+
+    assert(TYPEOF(source) == CPLXSXP);
+
     if (get_debug_mode()) {
         Rprintf("slice_complex_element\n");
         Rprintf("           SEXP: %p\n", x);
+        Rprintf("          source: %p\n", source);
         Rprintf("          index: %li\n", i);
         Rprintf("is_materialized: %i\n", is_materialized(x));
     }
@@ -357,10 +405,14 @@ static Rcomplex slice_complex_element(SEXP x, R_xlen_t i) {
         return COMPLEX_ELT(data, i);
     }
 
-    SEXP/*INTSXP*/  window = get_window(x);
-    SEXP/*CPLXSXP*/ source = get_source(x);
-
-    assert(TYPEOF(source) == CPLXSXP);
+    if (!index_within_bounds(window, i)) {
+#ifndef NA_COMPLEX
+        Rcomplex NA_COMPLEX;
+        NA_COMPLEX.i = NA_REAL;
+        NA_COMPLEX.r = NA_REAL;
+#endif
+        return NA_COMPLEX;
+    }
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -370,9 +422,15 @@ static Rcomplex slice_complex_element(SEXP x, R_xlen_t i) {
 static int slice_logical_element(SEXP x, R_xlen_t i) {
     assert(x != R_NilValue);
 
+    SEXP/*INTSXP*/ window = get_window(x);
+    SEXP/*LGLSXP*/ source = get_source(x);
+
+    assert(TYPEOF(source) == LGLSXP);
+
     if (get_debug_mode()) {
         Rprintf("slice_logical_element\n");
         Rprintf("           SEXP: %p\n", x);
+        Rprintf("          source: %p\n", source);
         Rprintf("          index: %li\n", i);
         Rprintf("is_materialized: %i\n", is_materialized(x));
     }
@@ -383,10 +441,9 @@ static int slice_logical_element(SEXP x, R_xlen_t i) {
         return LOGICAL_ELT(data, i);
     }
 
-    SEXP/*INTSXP*/ window = get_window(x);
-    SEXP/*LGLSXP*/ source = get_source(x);
-
-    assert(TYPEOF(source) == LGLSXP);
+    if (!index_within_bounds(window, i)) {
+        return NA_LOGICAL;
+    }
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -596,6 +653,14 @@ static SEXP slice_extract_subset(SEXP x, SEXP indices, SEXP call) {
         Rf_error("Non-contiguous slices are not implemented yet.\n"); // FIXME
     }
 
+    R_xlen_t window_start = 0;
+    R_xlen_t window_size  = 0;
+    read_start_and_size(window, &window_start, &window_size);
+
+    if (!are_indices_in_range(indices, 1, window_size)) {
+        Rf_error("Non-contiguous slices are not implemented yet.\n"); // FIXME
+    }
+
     // Contiguous indices.
     R_xlen_t start = get_first_element_as_length(indices) - 1;
     R_xlen_t projected_start = project_index(window, start);
@@ -608,34 +673,73 @@ static SEXP slice_extract_subset(SEXP x, SEXP indices, SEXP call) {
 // R_set_altstring_Elt_method
 // string_elt(SEXP x, R_xlen_t i)
 
-// UFO Inits
-void init_slice_altrep_class(DllInfo * dll) {
-    //R_altrep_class_t slice_altrep;
-    R_altrep_class_t cls = R_make_altinteger_class("slice_altrep", "viewport_altrep", dll);
-    slice_altrep = cls;
-
-    /* Override ALTREP methods */
+void init_common(R_altrep_class_t cls) {
     R_set_altrep_Duplicate_method(cls, slice_duplicate);
     R_set_altrep_Inspect_method(cls, slice_inspect);
     R_set_altrep_Length_method(cls, slice_length);
 
-    /* Override ALTVEC methods */
     R_set_altvec_Dataptr_method(cls, slice_dataptr);
     R_set_altvec_Dataptr_or_null_method(cls, slice_dataptr_or_null);
+    R_set_altvec_Extract_subset_method(cls, slice_extract_subset);
+}
+
+// UFO Inits
+void init_slice_integer_altrep_class(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("slice_integer_altrep", "viewports", dll);
+    slice_integer_altrep = cls;
+
+    init_common(cls);
 
     R_set_altinteger_Elt_method(cls, slice_integer_element);
-    R_set_altlogical_Elt_method(cls, slice_logical_element);
-    R_set_altreal_Elt_method   (cls, slice_numeric_element);
-    R_set_altcomplex_Elt_method(cls, slice_complex_element);
-    R_set_altraw_Elt_method    (cls, slice_raw_element);
-
     R_set_altinteger_Get_region_method(cls, slice_integer_get_region);
-    R_set_altlogical_Get_region_method(cls, slice_logical_get_region);
-    R_set_altreal_Get_region_method   (cls, slice_numeric_get_region);
-    R_set_altcomplex_Get_region_method(cls, slice_complex_get_region);
-    R_set_altraw_Get_region_method    (cls, slice_raw_get_region);
+}
 
-    R_set_altvec_Extract_subset_method(cls, slice_extract_subset);
+void init_slice_logical_altrep_class(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altlogical_class("slice_logical_altrep", "viewports", dll);
+    slice_logical_altrep = cls;
+
+    init_common(cls);
+
+    R_set_altlogical_Elt_method(cls, slice_logical_element);
+    R_set_altlogical_Get_region_method(cls, slice_logical_get_region);
+}
+
+void init_slice_numeric_altrep_class(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altreal_class("slice_numeric_altrep", "viewports", dll);
+    slice_numeric_altrep = cls;
+
+    init_common(cls);
+
+    R_set_altreal_Elt_method(cls, slice_numeric_element);
+    R_set_altreal_Get_region_method(cls, slice_numeric_get_region);
+}
+
+void init_slice_complex_altrep_class(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altcomplex_class("slice_complex_altrep", "viewports", dll);
+    slice_complex_altrep = cls;
+
+    init_common(cls);
+
+    R_set_altcomplex_Elt_method(cls, slice_complex_element);
+    R_set_altcomplex_Get_region_method(cls, slice_complex_get_region);
+}
+
+void init_slice_raw_altrep_class(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altraw_class("slice_raw_altrep", "viewports", dll);
+    slice_raw_altrep = cls;
+
+    init_common(cls);
+
+    R_set_altraw_Elt_method(cls, slice_raw_element);
+    R_set_altraw_Get_region_method(cls, slice_raw_get_region);
+}
+
+void init_slice_altrep_class(DllInfo * dll) {
+    init_slice_integer_altrep_class(dll);
+    init_slice_numeric_altrep_class(dll);
+    init_slice_logical_altrep_class(dll);
+    init_slice_complex_altrep_class(dll);
+    init_slice_raw_altrep_class(dll);
 }
 
 //SEXP/*NILSXP*/ slice(SEXP, SEXP/*INTSXP|REALSXP*/ start, SEXP/*INTSXP|REALSXP*/ size);
@@ -646,8 +750,11 @@ SEXP create_slice(SEXP source, SEXP/*INTSXP|REALSXP*/ start_sexp, SEXP/*INTSXP|R
     assert(XLENGTH(start_sexp) > 0);
     assert(XLENGTH(size_sexp) > 0);
 
-    R_xlen_t start = get_first_element_as_length(start_sexp) - 1;
-    R_xlen_t size  = get_first_element_as_length(size_sexp);
+    R_xlen_t start       = get_first_element_as_length(start_sexp) - 1;
+    R_xlen_t size        = get_first_element_as_length(size_sexp);
+
+    assert(start < XLENGTH(source));
+    assert(start + size <= XLENGTH(source));
 
     if (get_debug_mode()) {
         Rprintf("create slice\n");

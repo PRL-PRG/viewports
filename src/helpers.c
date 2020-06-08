@@ -90,7 +90,3 @@ size_t __get_element_size(SEXPTYPE vector_type) {
             Rf_error("Unrecognized vector type: %d\n", vector_type);
     }
 }
-
-
-
-

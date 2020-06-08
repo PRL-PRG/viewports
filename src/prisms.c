@@ -7,7 +7,6 @@
 #include <R.h>
 #include <Rinternals.h>
 #include <R_ext/Altrep.h>
-#include <R_ext/Rallocators.h>
 
 #include "debug.h"
 #include "helpers.h"
@@ -529,7 +528,7 @@ static SEXP prism_extract_subset(SEXP x, SEXP indices, SEXP call) {
 // UFO Inits
 void init_prism_altrep_class(DllInfo * dll) {
     //R_altrep_class_t prism_altrep;
-    R_altrep_class_t cls = R_make_altinteger_class("prism_altrep", "viewport_altrep", dll);
+    R_altrep_class_t cls = R_make_altinteger_class("prism_altrep", "viewports", dll);
     prism_altrep = cls;
 
     /* Override ALTREP methods */

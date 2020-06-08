@@ -1,5 +1,9 @@
 #include <assert.h>
 
+#define USE_RINTERNALS
+#include <R.h>
+#include <Rinternals.h>
+
 #include "common.h"
 
 bool are_integer_indices_monotonic(SEXP/*INTSXP*/ indices) {
@@ -98,6 +102,48 @@ bool are_indices_contiguous(SEXP/*INTSXP | REALSXP*/ indices) {
     switch (type) {
         case INTSXP:  return are_integer_indices_contiguous(indices);
         case REALSXP: return are_numeric_indices_contiguous(indices);
+        default:      Rf_error("Slices can be indexed by integer or numeric vectors but found: %d\n", type);
+    }
+}
+
+bool are_integer_indices_in_range(SEXP/*INTSXP*/ indices, R_xlen_t min, R_xlen_t max) {
+    assert(TYPEOF(indices) == INTSXP);
+    assert(min <= max);
+
+    R_xlen_t size = XLENGTH(indices);
+    for (int i = 0; i < size; i++) {
+        int current = INTEGER_ELT(indices, i);
+        if (current < min || current > max) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool are_numeric_indices_in_range(SEXP/*REALSXP*/ indices, R_xlen_t min, R_xlen_t max) {
+    assert(TYPEOF(indices) == REALSXP);
+    assert(min <= max);
+
+    R_xlen_t size = XLENGTH(indices);
+    for (int i = 0; i < size; i++) {
+        double current = REAL_ELT(indices, i);
+        if (current < min || current > max) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool are_indices_in_range(SEXP/*INTSXP | REALSXP*/ indices, R_xlen_t min, R_xlen_t max) {
+    SEXPTYPE type = TYPEOF(indices);
+    assert(type == INTSXP || type == REALSXP);
+    assert(min <= max);
+
+    switch (type) {
+        case INTSXP:  return are_integer_indices_in_range(indices, min, max);
+        case REALSXP: return are_numeric_indices_in_range(indices, min, max);
         default:      Rf_error("Slices can be indexed by integer or numeric vectors but found: %d\n", type);
     }
 }

@@ -1,13 +1,17 @@
 Package: viewports
 Type: Package
-Title: ALTREP implementation of viewports peering into sections of vectors
+Date: 2020-06-06
+Title: ALTREP implementation of viewports peering into sections of (large) vectors
 Description: An ALTREP implementation of viewports which emulate a subset of other vectors and, when retrieving
              elements, they translate the indices into the source vector's indices and retrieve elements from there.
-Version: 0.1.0
-Authors@R: c(person(given = "Konrad",  family = "Siek", role = c("aut", "cre"), email = "siekkonr@fit.cvut.cz"))
+Version: 1.0
 Maintainer: Konrad Siek <siekkonr@fit.cvut.cz>
+Author: Konrad Siek <siekkonr@fit.cvut.cz>
 License: GPL-2 | GPL-3
 Encoding: UTF-8
 LazyData: true
+Depends: R (>= 3.4.0)
+Suggests: testthat
 NeedsCompilation: yes
+URL: https://github.com/PRL-PRG/viewports
 
