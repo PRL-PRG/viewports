@@ -46,7 +46,7 @@ test_that("write to source", {
                                     # was created. Boo.
 })
 
-test_that("write to slice", {
+test_that("write to mosaic", {
     source <- 1:10000
     viewport <- slice(source, 100, 200)
 

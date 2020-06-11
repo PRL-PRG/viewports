@@ -34,7 +34,7 @@ test_that("write to source", {
                                     # was created. Boo.
 })
 
-test_that("write to viewport", {
+test_that("write to prism", {
     source <- 1:10000
     viewport <- slice(source, 100, 200)
 
