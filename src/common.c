@@ -204,7 +204,7 @@ void copy_element(SEXP source, R_xlen_t source_index, SEXP target, R_xlen_t targ
            || TYPEOF(source) == STRSXP);
 
     switch(TYPEOF(source)) {
-        case INTSXP:  SET_INTEGER_ELT (target, target_index, INTEGER_ELT (source, source_index)); break;
+        case INTSXP:  SET_INTEGER_ELT (target, target_index, INTEGER_ELT (source, source_index)); break;                // FIXME Invalid write of size 4
         case REALSXP: SET_REAL_ELT    (target, target_index, REAL_ELT    (source, source_index)); break;
         case LGLSXP:  SET_LOGICAL_ELT (target, target_index, LOGICAL_ELT (source, source_index)); break;
         case CPLXSXP: SET_COMPLEX_ELT (target, target_index, COMPLEX_ELT (source, source_index)); break;

@@ -742,8 +742,6 @@ void init_slice_altrep_class(DllInfo * dll) {
     init_slice_raw_altrep_class(dll);
 }
 
-//SEXP/*NILSXP*/ slice(SEXP, SEXP/*INTSXP|REALSXP*/ start, SEXP/*INTSXP|REALSXP*/ size);
-
 SEXP create_slice(SEXP source, SEXP/*INTSXP|REALSXP*/ start_sexp, SEXP/*INTSXP|REALSXP*/ size_sexp) {
     assert(TYPEOF(start_sexp) == INTSXP || TYPEOF(start_sexp) == REALSXP);
     assert(TYPEOF(size_sexp) == INTSXP || TYPEOF(size_sexp) == REALSXP);

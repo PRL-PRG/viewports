@@ -14,7 +14,22 @@
 #include "slices.h"
 #include "common.h"
 
-static R_altrep_class_t prism_altrep;
+static R_altrep_class_t prism_integer_altrep;
+static R_altrep_class_t prism_numeric_altrep;
+static R_altrep_class_t prism_logical_altrep;
+static R_altrep_class_t prism_complex_altrep;
+static R_altrep_class_t prism_raw_altrep;
+
+static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) {
+    switch (type) {
+        case INTSXP:  return prism_integer_altrep;
+        case REALSXP: return prism_numeric_altrep;
+        case LGLSXP:  return prism_logical_altrep;
+        case CPLXSXP: return prism_complex_altrep;
+        case RAWSXP:  return prism_raw_altrep;
+        default:      Rf_error("No ALTREP prism class for vector of type %s", type2str(type));
+    }
+}
 
 SEXP prism_new(SEXP source, SEXP/*INTSXP|REALSXP*/ indices) {
     assert(sizeof(double) >= sizeof(R_xlen_t));
@@ -36,7 +51,7 @@ SEXP prism_new(SEXP source, SEXP/*INTSXP|REALSXP*/ indices) {
     SET_TAG(data, R_NilValue); // Starts as R_NilValue, becomes a vector if it the prism is written to
     SETCDR (data, R_NilValue); // Nothing here
 
-    return R_new_altrep(prism_altrep, indices, data);
+    return R_new_altrep(class_from_sexp_type(TYPEOF(source)), indices, data);
 }
 
 static inline SEXP/*INTSXP|REALSXP*/ get_indices(SEXP x) {
@@ -91,7 +106,7 @@ SEXP prism_duplicate(SEXP x, Rboolean deep) {//TODO
             SET_TAG(data, R_NilValue);
         }
         SETCDR (data, R_NilValue);
-        return R_new_altrep(prism_altrep, indices, data);
+        return R_new_altrep(class_from_sexp_type(TYPEOF(source)), indices, data);
     }
 }
 
@@ -525,34 +540,73 @@ static SEXP prism_extract_subset(SEXP x, SEXP indices, SEXP call) {
 // R_set_altstring_Elt_method
 // string_elt(SEXP x, R_xlen_t i)
 
-// UFO Inits
-void init_prism_altrep_class(DllInfo * dll) {
-    //R_altrep_class_t prism_altrep;
-    R_altrep_class_t cls = R_make_altinteger_class("prism_altrep", "viewports", dll);
-    prism_altrep = cls;
-
-    /* Override ALTREP methods */
+void init_common_prism(R_altrep_class_t cls) {
     R_set_altrep_Duplicate_method(cls, prism_duplicate);
     R_set_altrep_Inspect_method(cls, prism_inspect);
     R_set_altrep_Length_method(cls, prism_length);
 
-    /* Override ALTVEC methods */
     R_set_altvec_Dataptr_method(cls, prism_dataptr);
     R_set_altvec_Dataptr_or_null_method(cls, prism_dataptr_or_null);
+    R_set_altvec_Extract_subset_method(cls, prism_extract_subset);
+}
+
+void init_integer_prism(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("prism_integer_altrep", "viewports", dll);
+    prism_integer_altrep = cls;
+
+    init_common_prism(cls);
 
     R_set_altinteger_Elt_method(cls, prism_integer_element);
-    R_set_altlogical_Elt_method(cls, prism_logical_element);
-    R_set_altreal_Elt_method   (cls, prism_numeric_element);
-    R_set_altcomplex_Elt_method(cls, prism_complex_element);
-    R_set_altraw_Elt_method    (cls, prism_raw_element);
-
     R_set_altinteger_Get_region_method(cls, prism_integer_get_region);
-    R_set_altlogical_Get_region_method(cls, prism_logical_get_region);
-    R_set_altreal_Get_region_method   (cls, prism_numeric_get_region);
-    R_set_altcomplex_Get_region_method(cls, prism_complex_get_region);
-    R_set_altraw_Get_region_method    (cls, prism_raw_get_region);
+}
 
-    R_set_altvec_Extract_subset_method(cls, prism_extract_subset);
+void init_numeric_prism(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("prism_numeric_altrep", "viewports", dll);
+    prism_numeric_altrep = cls;
+
+    init_common_prism(cls);
+
+    R_set_altreal_Elt_method   (cls, prism_numeric_element);
+    R_set_altreal_Get_region_method   (cls, prism_numeric_get_region);
+}
+
+void init_logical_prism(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("prism_logical_altrep", "viewports", dll);
+    prism_logical_altrep = cls;
+
+    init_common_prism(cls);
+
+    R_set_altlogical_Elt_method(cls, prism_logical_element);
+    R_set_altlogical_Get_region_method(cls, prism_logical_get_region);
+}
+
+void init_complex_prism(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("prism_complex_altrep", "viewports", dll);
+    prism_complex_altrep = cls;
+
+    init_common_prism(cls);
+
+    R_set_altcomplex_Elt_method(cls, prism_complex_element);
+    R_set_altcomplex_Get_region_method(cls, prism_complex_get_region);
+}
+
+void init_raw_prism(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("prism_raw_altrep", "viewports", dll);
+    prism_raw_altrep = cls;
+
+    init_common_prism(cls);
+
+    R_set_altraw_Elt_method    (cls, prism_raw_element);
+    R_set_altraw_Get_region_method    (cls, prism_raw_get_region);
+}
+
+// UFO Inits
+void init_prism_altrep_class(DllInfo * dll) {
+    init_integer_prism(dll);
+    init_numeric_prism(dll);
+    init_logical_prism(dll);
+    init_complex_prism(dll);
+    init_raw_prism(dll);
 }
 
 //SEXP/*NILSXP*/ prism(SEXP, SEXP/*INTSXP|REALSXP*/ start, SEXP/*INTSXP|REALSXP*/ size);

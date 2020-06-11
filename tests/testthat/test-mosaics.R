@@ -1,19 +1,39 @@
-context("Slice viewports")
+context("Mosaic viewports")
 
-test_that("create a slice", {
-    source <- 1:10000
-    viewport <- slice(source, 100, 200)
+test_that("create a mosaic from integer indices", {
+    source   <- 1:10000
+    viewport <- mosaic(source, as.integer(5:10))
 
+    expect_equal(length(viewport), 6)
     expect_vector(viewport)
     expect_type(viewport, "integer")
+
+    for (i in 1:5) { expect_equal(viewport[i], 5+i-1) }
+    expect_equal(viewport, 5:10)
 })
 
-test_that("reference a slice", {
-    source <- 1:10000
-    viewport <- slice(source, 100, 200)
+test_that("create a mosaic from numeric indices", {
+    source   <- 1:10000
+    viewport <- mosaic(source, as.numeric(5:10))
 
-    for (i in 1:200) { expect_equal(viewport[i], 100+i-1) }
-    expect_equal(viewport, 100:299)
+    expect_type(viewport, "integer")
+    expect_equal(length(viewport), 6)
+    expect_vector(viewport)
+
+    for (i in 1:5) { expect_equal(viewport[i], 5+i-1) }
+    expect_equal(viewport, 5:10)
+})
+
+test_that("create a mosaic from logical mask", {
+    source   <- 1:10000
+    mask     <- mapply(function(x) x >= 5 && x <= 10, 1:10000)
+    viewport <- mosaic(source, mask)
+
+    expect_type(viewport, "integer")
+    expect_vector(viewport)
+
+    for (i in 1:5) { expect_equal(viewport[i], 5+i-1) }
+    expect_equal(viewport, 5:10)
 })
 
 test_that("write to source", {
@@ -44,14 +64,14 @@ test_that("dereference out of range", {
     source <- 1:100
     viewport <- slice(source, 10, 10)
 
-    expect_equal(viewport[100], NA)
+    expect_equal(slice[100], NA)
 })
 
 test_that("region partially out of range", {
     source <- 1:100
     viewport <- slice(source, 10, 10)
 
-    expect_equal(viewport[5:10], c(14,15,16,17,18,19,20,NA,NA,NA,NA))
+    expect_equal(slice[5:10], c(14,15,16,17,18,19,20,NA,NA,NA,NA))
 })
 
 test_that("integer test", {

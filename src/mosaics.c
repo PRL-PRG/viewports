@@ -15,7 +15,22 @@
 #include "common.h"
 #include "mosaics.h"
 
-static R_altrep_class_t mosaic_altrep;
+static R_altrep_class_t mosaic_integer_altrep;
+static R_altrep_class_t mosaic_numeric_altrep;
+static R_altrep_class_t mosaic_logical_altrep;
+static R_altrep_class_t mosaic_complex_altrep;
+static R_altrep_class_t mosaic_raw_altrep;
+
+static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) {
+    switch (type) {
+        case INTSXP:  return mosaic_integer_altrep;
+        case REALSXP: return mosaic_numeric_altrep;
+        case LGLSXP:  return mosaic_logical_altrep;
+        case CPLXSXP: return mosaic_complex_altrep;
+        case RAWSXP:  return mosaic_raw_altrep;
+        default:      Rf_error("No ALTREP mosaic class for vector of type %s", type2str(type));
+    }
+}
 
 #define how_many_ints_in_R_xlen_t (sizeof(R_xlen_t) / sizeof(int))
 
@@ -26,14 +41,14 @@ R_xlen_t convert_logical_mask_to_bitmap(SEXP/*LGLSXP*/ mask, SEXP/*INTSXP*/ bitm
     assert(XLENGTH(mask) == XTRUELENGTH(bitmap));
 
     R_xlen_t elements = 0;
-    for (int i = 0; i < size; i++) {
+    for (R_xlen_t i = 0; i < size; i++) {
         Rboolean current = LOGICAL_ELT(mask, i);
         if (current == NA_LOGICAL) {
             Rf_error("Mosaics cannot be created from a logical mask containing NA\n");
         }
         if (current == TRUE) {
+            bitmap_set(bitmap, i);
             elements++;
-            bitmap_set(bitmap, (R_xlen_t) current);
         }
     }
 
@@ -121,7 +136,7 @@ SEXP/*A*/ mosaic_new(SEXP/*A*/ source, SEXP/*INTSXP*/ bitmap, R_xlen_t size) {
     SET_TAG(data, R_NilValue);    // Starts as R_NilValue, becomes a vector if it the mosaic is written to
     SETCDR (data, length_vector); // The number of set bits in the mask goes here, aka length
 
-    return R_new_altrep(mosaic_altrep, bitmap, data);
+    return R_new_altrep(class_from_sexp_type(TYPEOF(source)), bitmap, data);
 }
 
 //SEXP/*A*/ mosaic_new_from_bitmap(SEXP/*A*/ source, SEXP/*INTSXP*/ source_bitmap) {
@@ -218,7 +233,7 @@ SEXP mosaic_duplicate(SEXP x, Rboolean deep) {
         SEXP data = is_materialized(x) ? get_materialized_data(x) : R_NilValue;
         SET_TAG(meta, data);                 // Starts as R_NilValue, becomes a vector if it the mosaic is written to
         SETCDR (meta, get_length_vector(x)); // Length vector here
-        return R_new_altrep(mosaic_altrep, bitmap, meta);
+        return R_new_altrep(class_from_sexp_type(TYPEOF(source)), bitmap, meta);
     }
 }
 
@@ -251,7 +266,7 @@ SEXP copy_from_source(SEXP x) {
     SEXP materialized = allocVector(TYPEOF(source), length);
     R_xlen_t cursor = 0;
     for (R_xlen_t index = 0; index < XLENGTH(source); index++) {
-        if (bitmap_get(bitmap, index)) {
+        if (bitmap_get(bitmap, index)) {                            // FIXME Conditional jump or move depends on uninitialised value(s)
             copy_element(source, index, materialized, cursor);
             cursor++;
         }
@@ -583,7 +598,7 @@ static SEXP mosaic_extract_subset(SEXP x, SEXP indices, SEXP call) {
 
     // Monotonic indices.
     R_xlen_t translated_bitmap_size = get_length(x);
-    SEXP translated_bitmap = bitmap_new(translated_bitmap_size);
+    SEXP translated_bitmap = bitmap_new(XLENGTH(source));
     R_xlen_t viewport_index = 0;
     R_xlen_t indices_index = 0;
     for (R_xlen_t i = 0; i < translated_bitmap_size; i++) {
@@ -607,34 +622,73 @@ static SEXP mosaic_extract_subset(SEXP x, SEXP indices, SEXP call) {
 // R_set_altstring_Elt_method
 // string_elt(SEXP x, R_xlen_t i)
 
-// UFO Inits
-void init_mosaic_altrep_class(DllInfo * dll) {
-    //R_altrep_class_t mosaic_altrep;
-    R_altrep_class_t cls = R_make_altinteger_class("mosaic_altrep", "viewports", dll);
-    mosaic_altrep = cls;
-
-    /* Override ALTREP methods */
+void init_common_mosaic(R_altrep_class_t cls) {
     R_set_altrep_Duplicate_method(cls, mosaic_duplicate);
     R_set_altrep_Inspect_method(cls, mosaic_inspect);
     R_set_altrep_Length_method(cls, mosaic_length);
 
-    /* Override ALTVEC methods */
     R_set_altvec_Dataptr_method(cls, mosaic_dataptr);
     R_set_altvec_Dataptr_or_null_method(cls, mosaic_dataptr_or_null);
+    R_set_altvec_Extract_subset_method(cls, mosaic_extract_subset);
+}
+
+void init_integer_mosaic(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("mosaic_integer_altrep", "viewports", dll);
+    mosaic_integer_altrep = cls;
+
+    init_common_mosaic(cls);
 
     R_set_altinteger_Elt_method(cls, mosaic_integer_element);
-    R_set_altlogical_Elt_method(cls, mosaic_logical_element);
-    R_set_altreal_Elt_method   (cls, mosaic_numeric_element);
-    R_set_altcomplex_Elt_method(cls, mosaic_complex_element);
-    R_set_altraw_Elt_method    (cls, mosaic_raw_element);
-
     R_set_altinteger_Get_region_method(cls, mosaic_integer_get_region);
-    R_set_altlogical_Get_region_method(cls, mosaic_logical_get_region);
-    R_set_altreal_Get_region_method   (cls, mosaic_numeric_get_region);
-    R_set_altcomplex_Get_region_method(cls, mosaic_complex_get_region);
-    R_set_altraw_Get_region_method    (cls, mosaic_raw_get_region);
+}
 
-    R_set_altvec_Extract_subset_method(cls, mosaic_extract_subset);
+void init_numeric_mosaic(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("mosaic_numeric_altrep", "viewports", dll);
+    mosaic_numeric_altrep = cls;
+
+    init_common_mosaic(cls);
+
+    R_set_altreal_Elt_method   (cls, mosaic_numeric_element);
+    R_set_altreal_Get_region_method   (cls, mosaic_numeric_get_region);
+}
+
+void init_logical_mosaic(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("mosaic_logical_altrep", "viewports", dll);
+    mosaic_logical_altrep = cls;
+
+    init_common_mosaic(cls);
+
+    R_set_altlogical_Elt_method(cls, mosaic_logical_element);
+    R_set_altlogical_Get_region_method(cls, mosaic_logical_get_region);
+}
+
+void init_complex_mosaic(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("mosaic_complex_altrep", "viewports", dll);
+    mosaic_complex_altrep = cls;
+
+    init_common_mosaic(cls);
+
+    R_set_altcomplex_Elt_method(cls, mosaic_complex_element);
+    R_set_altcomplex_Get_region_method(cls, mosaic_complex_get_region);
+}
+
+void init_raw_mosaic(DllInfo * dll) {
+    R_altrep_class_t cls = R_make_altinteger_class("mosaic_raw_altrep", "viewports", dll);
+    mosaic_raw_altrep = cls;
+
+    init_common_mosaic(cls);
+
+    R_set_altraw_Elt_method    (cls, mosaic_raw_element);
+    R_set_altraw_Get_region_method    (cls, mosaic_raw_get_region);
+}
+
+// UFO Inits
+void init_mosaic_altrep_class(DllInfo * dll) {
+    init_integer_mosaic(dll);
+    init_numeric_mosaic(dll);
+    init_logical_mosaic(dll);
+    init_complex_mosaic(dll);
+    init_raw_mosaic(dll);
 }
 
 
@@ -659,8 +713,8 @@ SEXP/*A*/ create_mosaic(SEXP/*A*/ source, SEXP/*INTSXP|REALSXP|LGLSXP*/ indices)
         Rprintf(" indices length: %li\n", XLENGTH(indices));
     }
 
-    R_xlen_t how_many_indices = XLENGTH(indices);
-    SEXP/*INTSXP*/ bitmap = bitmap_new(how_many_indices);
+    //R_xlen_t how_many_indices = XLENGTH(indices);
+    SEXP/*INTSXP*/ bitmap = bitmap_new(XLENGTH(source));
     R_xlen_t how_many_set_bits = convert_indices_to_bitmap(indices, bitmap);
 
     //SEXP/*REALSXP*/ length_vector = allocVector(REALSXP, 1);
