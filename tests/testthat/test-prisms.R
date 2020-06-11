@@ -26,7 +26,7 @@ test_that("create a prism from numeric indices", {
 
 test_that("write to source", {
     source <- as.integer(1:10000)
-    viewport <- slice(source, 100, 200)
+    viewport <- prism(source, 100:200)
 
     expect_equal(viewport[1], 100)
     source[100] <- 42
@@ -36,7 +36,7 @@ test_that("write to source", {
 
 test_that("write to prism", {
     source <- 1:10000
-    viewport <- slice(source, 100, 200)
+    viewport <- prism(source, 100:200)
 
     expect_equal(viewport[1], 100)
     viewport[1] <- 42
@@ -45,26 +45,26 @@ test_that("write to prism", {
 
 test_that("check range", {
     source <- 1:100
-    expect_error(slice(source, 200, 200))
+    expect_error(prism(source, 200:400))
 })
 
 test_that("dereference out of range", {
     source <- 1:100
-    viewport <- slice(source, 10, 10)
+    viewport <- prism(source, 10, 10)
 
-    expect_equal(slice[100], NA)
+    expect_equal(viewport[100], NA)
 })
 
 test_that("region partially out of range", {
     source <- 1:100
-    viewport <- slice(source, 10, 10)
+    viewport <- prism(source, 10:20)
 
-    expect_equal(slice[5:10], c(14,15,16,17,18,19,20,NA,NA,NA,NA))
+    expect_equal(viewport[5:10], c(14,15,16,17,18,19,20,NA,NA,NA,NA))
 })
 
 test_that("integer test", {
     source <- as.integer(c(1,2,3,4,5,6,7,8,9,10))
-    viewport <- slice(source, 4, 4)
+    viewport <- prism(source, c(4,5,7,6))
 
     expect_vector(viewport)
     expect_type(viewport, "integer")
@@ -77,52 +77,52 @@ test_that("integer test", {
 
 test_that("numeric test", {
     source <- as.numeric(c(1,2,3,4,5,6,7,8,9,10))
-    viewport <- slice(source, 4, 4)
+    viewport <- prism(source, c(4,5,7,6))
 
     expect_vector(viewport)
     expect_type(viewport, "double")
 
     expect_equal(viewport[1], 4)
     expect_equal(viewport[2], 5)
-    expect_equal(viewport[3], 6)
-    expect_equal(viewport[4], 7)
+    expect_equal(viewport[3], 7)
+    expect_equal(viewport[4], 6)
 })
 
 test_that("logical test", {
     source <- as.logical(c(T, F, T, F, T, F, T, F, T, F, T, F))
-    viewport <- slice(source, 4, 4)
+    viewport <- prism(source, c(4,5,7,6))
 
     expect_vector(viewport)
     expect_type(viewport, "logical")
 
     expect_equal(viewport[1], F)
     expect_equal(viewport[2], T)
-    expect_equal(viewport[3], F)
-    expect_equal(viewport[4], T)
+    expect_equal(viewport[3], T)
+    expect_equal(viewport[4], F)
 })
 
 test_that("complex test", {
     source <- as.complex(c(1,2,3,4,5,6,7,8,9,10))
-    viewport <- slice(source, 4, 4)
+    viewport <- prism(source, c(4,5,7,6))
 
     expect_vector(viewport)
     expect_type(viewport, "complex")
 
     expect_equal(viewport[1], 4+0i)
     expect_equal(viewport[2], 5+0i)
-    expect_equal(viewport[3], 6+0i)
-    expect_equal(viewport[4], 7+0i)
+    expect_equal(viewport[3], 7+0i)
+    expect_equal(viewport[4], 6+0i)
 })
 
 test_that("raw test", {
     source <- as.raw(c(1,2,3,4,5,6,7,8,9,10))
-    viewport <- slice(source, 4, 4)
+    viewport <- prism(source, c(4,5,7,6))
 
     expect_vector(viewport)
     expect_type(viewport, "raw")
 
     expect_equal(viewport[1], as.raw(04))
     expect_equal(viewport[2], as.raw(05))
-    expect_equal(viewport[3], as.raw(06))
-    expect_equal(viewport[4], as.raw(07))
+    expect_equal(viewport[3], as.raw(07))
+    expect_equal(viewport[4], as.raw(06))
 })
