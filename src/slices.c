@@ -13,6 +13,8 @@
 
 #include "slices.h"
 #include "common.h"
+#include "mosaics.h"
+#include "prisms.h"
 
 #ifndef NA_RAW
 #define NA_RAW 0
@@ -25,7 +27,7 @@ static R_altrep_class_t slice_complex_altrep;
 static R_altrep_class_t slice_raw_altrep;
 //static R_altrep_class_t slice_vector_altrep;
 
-static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) {
+static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) { // @suppress("No return")
     switch (type) {
         case INTSXP:  return slice_integer_altrep;
         case REALSXP: return slice_numeric_altrep;
@@ -217,6 +219,9 @@ const void *extract_read_only_data_pointer(SEXP x) {
         }
         default: Rf_error("Illegal source type for a slice: %i.\n", type);
     }
+
+    assert(false);
+    return NULL;
 }
 
 static void *slice_dataptr(SEXP x, Rboolean writeable) {
@@ -623,7 +628,41 @@ static R_xlen_t slice_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *bu
 ////    }
 ////}
 
+SEXP translate_indices(SEXP original, R_xlen_t offset) {
+	assert(TYPEOF(original) == INTSXP || TYPEOF(original) == REALSXP);
+	assert(sizeof(R_xlen_t) <= sizeof(double));
 
+	SEXP translated = allocVector(REALSXP, XLENGTH(original)); // FIXME translation altrep vector
+
+	switch (TYPEOF(original)) {
+	case INTSXP:
+		for (R_xlen_t i = 0; i < XLENGTH(translated); i++) {
+			int original_element = INTEGER_ELT(original, i);
+			if (original_element == NA_INTEGER) {
+				SET_REAL_ELT(translated, i, NA_REAL);
+			} else {
+				SET_REAL_ELT(translated, i, ((R_xlen_t) original_element) + offset);
+			}
+		}
+		break;
+
+	case REALSXP:
+		for (R_xlen_t i = 0; i < XLENGTH(translated); i++) {
+			int original_element = REAL_ELT(original, i);
+			if (original_element == NA_REAL) {
+				SET_REAL_ELT(translated, i, NA_REAL);
+			} else {
+				SET_REAL_ELT(translated, i, ((R_xlen_t) original_element) + offset);
+			}
+		}
+		break;
+
+	default:
+		Rf_error("Indices are expected to be either INTSXP or REALSXP");
+	}
+
+	return translated;
+}
 
 static SEXP slice_extract_subset(SEXP x, SEXP indices, SEXP call) {
     assert(x != NULL);
@@ -649,16 +688,24 @@ static SEXP slice_extract_subset(SEXP x, SEXP indices, SEXP call) {
         return copy_data_at_indices(source, indices);
     }
 
-    if (!are_indices_contiguous(indices)) {
-        Rf_error("Non-contiguous slices are not implemented yet.\n"); // FIXME
-    }
-
     R_xlen_t window_start = 0;
     R_xlen_t window_size  = 0;
     read_start_and_size(window, &window_start, &window_size);
 
     if (!are_indices_in_range(indices, 1, window_size)) {
-        Rf_error("Non-contiguous slices are not implemented yet.\n"); // FIXME
+    	SEXP translated_indices = translate_indices(indices, window_start);
+    	return copy_data_at_indices(source, translated_indices);
+    }
+
+    if (!are_indices_contiguous(indices)) {
+    	SEXP translated_indices = translate_indices(indices, window_start);
+        if (are_indices_monotonic(indices)) {
+        	return create_mosaic(source, translated_indices);
+        	//Rf_error("Mosaics of slices are not implemented yet.\n"); // FIXME
+        } else {
+        	return create_prism(source, translated_indices);
+        	//Rf_error("Prisms of slices are not implemented yet.\n"); // FIXME
+        }
     }
 
     // Contiguous indices.

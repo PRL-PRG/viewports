@@ -84,4 +84,6 @@ R_xlen_t bitmap_index_of_nth_set_bit (SEXP/*INTSXP*/ bitmap, R_xlen_t which_bit)
     }
 
     Rf_error("Bitmap index out of range.");
+    assert(false);
+    return 0;
 }

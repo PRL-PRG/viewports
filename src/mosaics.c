@@ -21,7 +21,7 @@ static R_altrep_class_t mosaic_logical_altrep;
 static R_altrep_class_t mosaic_complex_altrep;
 static R_altrep_class_t mosaic_raw_altrep;
 
-static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) {
+static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) { // @suppress("No return")
     switch (type) {
         case INTSXP:  return mosaic_integer_altrep;
         case REALSXP: return mosaic_numeric_altrep;
@@ -98,7 +98,7 @@ R_xlen_t convert_numeric_indices_to_bitmap(SEXP/*REALSXP*/ indices, SEXP/*INTSXP
 }
 
 
-R_xlen_t convert_indices_to_bitmap(SEXP/*INTSXP | REALSXP | LGLSXP*/ indices, SEXP/*INTSXP*/ bitmap) {
+R_xlen_t convert_indices_to_bitmap(SEXP/*INTSXP | REALSXP | LGLSXP*/ indices, SEXP/*INTSXP*/ bitmap) {  // @suppress("No return")
     SEXPTYPE type = TYPEOF(indices);
     assert(type == INTSXP || type == REALSXP || type == LGLSXP);
 

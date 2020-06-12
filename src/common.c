@@ -66,7 +66,7 @@ bool are_integer_indices_contiguous(SEXP/*INTSXP*/ indices) {
         if (current == NA_INTEGER) {
             return false;
         }
-        if (previous != NA_INTEGER && previous != current + 1) {
+        if (previous != NA_INTEGER && previous != current - 1) {
             return false;
         }
         previous = current;

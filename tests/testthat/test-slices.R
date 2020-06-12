@@ -51,7 +51,25 @@ test_that("region partially out of range", {
     source <- 1:100
     viewport <- slice(source, 10, 10)
 
-    expect_equal(viewport[5:10], c(14,15,16,17,18,19,20,NA,NA,NA,NA))
+    expect_equal(viewport[5:10], c(14,15,16,17,18,19,NA,NA,NA,NA))
+})
+
+test_that("subset contiguous monotonic", {
+    source <- 1:100
+    viewport <- slice(source, 10, 10)
+    expect_equal(viewport[2:4], as.integer(c(11, 12, 13)))
+})
+
+test_that("subset non-contiguous monotonic", {
+    source <- 1:100
+    viewport <- slice(source, 10, 10)
+    expect_equal(viewport[c(1,3,5)], as.integer(c(10, 12, 14)))
+})
+
+test_that("subset non-contiguous non-monotonic", {
+    source <- 1:100
+    viewport <- slice(source, 10, 10)
+    expect_equal(viewport[c(1,5,3)], as.integer(c(10, 14, 12)))
 })
 
 test_that("integer test", {

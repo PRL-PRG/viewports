@@ -20,7 +20,7 @@ static R_altrep_class_t prism_logical_altrep;
 static R_altrep_class_t prism_complex_altrep;
 static R_altrep_class_t prism_raw_altrep;
 
-static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) {
+static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) { // @suppress("No return")
     switch (type) {
         case INTSXP:  return prism_integer_altrep;
         case REALSXP: return prism_numeric_altrep;
@@ -34,7 +34,7 @@ static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) {
 SEXP prism_new(SEXP source, SEXP/*INTSXP|REALSXP*/ indices) {
     assert(sizeof(double) >= sizeof(R_xlen_t));
     assert(TYPEOF(indices) == REALSXP || TYPEOF(indices) == INTSXP);
-    assert(source != null);
+    assert(source != NULL);
 
     if (get_debug_mode()) {
         Rprintf("prism_new\n");
@@ -613,7 +613,7 @@ void init_prism_altrep_class(DllInfo * dll) {
 
 
 SEXP create_prism(SEXP source, SEXP/*INTSXP|REALSXP*/ indices) {
-    assert(TYPEOF(indices_sexp) == INTSXP || TYPEOF(indices_sexp) == REALSXP);
+    assert(TYPEOF(indices) == INTSXP || TYPEOF(indices) == REALSXP);
 
     if (get_debug_mode()) {
         Rprintf("create prism\n");
