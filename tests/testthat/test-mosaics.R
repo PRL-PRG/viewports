@@ -62,16 +62,17 @@ test_that("write to mosaic", {
 
 test_that("dereference out of range", {
     source <- 1:100
-    viewport <- mosaic(source, 4:7)
+    viewport <- mosaic(source, 10:20)
 
-    expect_equal(viewport[100], NA)
+    expect_equal(viewport[100], as.integer(NA))
 })
 
 test_that("region partially out of range", {
     source <- 1:100
-    viewport <- mosaic(source, 4:7)
+    viewport <- mosaic(source, 10:19)
+    definition <- source[10:19]
 
-    expect_equal(viewport[5:10], c(14,15,16,17,18,19,20,NA,NA,NA,NA))
+    expect_equal(viewport[5:15], definition[5:15])
 })
 
 test_that("integer test", {
@@ -102,7 +103,7 @@ test_that("numeric test", {
 
 test_that("logical test", {
     source <- as.logical(c(T, F, T, F, T, F, T, F, T, F, T, F))
-    viewport <- mosaic(source, 4, 4)
+    viewport <- mosaic(source, 4:7)
 
     expect_vector(viewport)
     expect_type(viewport, "logical")
@@ -115,7 +116,7 @@ test_that("logical test", {
 
 test_that("complex test", {
     source <- as.complex(c(1,2,3,4,5,6,7,8,9,10))
-    viewport <- mosaic(source, 4, 4)
+    viewport <- mosaic(source, 4:7)
 
     expect_vector(viewport)
     expect_type(viewport, "complex")
@@ -128,7 +129,7 @@ test_that("complex test", {
 
 test_that("raw test", {
     source <- as.raw(c(1,2,3,4,5,6,7,8,9,10))
-    viewport <- mosaic(source, 4, 4)
+    viewport <- mosaic(source, 4:7)
 
     expect_vector(viewport)
     expect_type(viewport, "raw")

@@ -44,14 +44,14 @@ test_that("dereference out of range", {
     source <- 1:100
     viewport <- slice(source, 10, 10)
 
-    expect_equal(viewport[100], NA)
+    expect_equal(viewport[100], as.numeric(NA))
 })
 
 test_that("region partially out of range", {
     source <- 1:100
     viewport <- slice(source, 10, 10)
 
-    expect_equal(viewport[5:10], c(14,15,16,17,18,19,NA,NA,NA,NA))
+    expect_equal(viewport[5:15], c(14,15,16,17,18,19,NA,NA,NA,NA,NA))
 })
 
 test_that("subset contiguous monotonic", {

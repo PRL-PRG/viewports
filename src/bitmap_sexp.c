@@ -73,13 +73,18 @@ R_xlen_t bitmap_index_of_nth_set_bit (SEXP/*INTSXP*/ bitmap, R_xlen_t which_bit)
     R_xlen_t how_many_bits = XTRUELENGTH(bitmap);
     assert(which_bit < how_many_bits);
 
+    bool encountered_any_ones_yet = false;
     R_xlen_t ones_encountered_so_far = 0;
     for (R_xlen_t i = 0; i < how_many_bits; i++) {
         if (bitmap_get(bitmap, i)) {
+        	if (encountered_any_ones_yet) {
+        		ones_encountered_so_far++;
+        	} else {
+        		encountered_any_ones_yet = true;
+        	}
             if (ones_encountered_so_far == which_bit) {
                 return i;
             }
-            ones_encountered_so_far++;
         }
     }
 

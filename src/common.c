@@ -33,10 +33,10 @@ bool are_numeric_indices_monotonic(SEXP/*REALSXP*/ indices) {
 
     for (int i = 0; i < size; i++) {
         double current = REAL_ELT(indices, i);
-        if (current == NA_REAL) {
+        if (ISNAN(current)) {
             return false;
         }
-        if (previous != NA_REAL && previous >= current) {
+        if (!ISNAN(previous) && previous >= current) {
             return false;
         }
         previous = current;
@@ -83,10 +83,10 @@ bool are_numeric_indices_contiguous(SEXP/*REALSXP*/ indices) {
 
     for (int i = 0; i < size; i++) {
         double current = REAL_ELT(indices, i);
-        if (current == NA_REAL) {
+        if (ISNAN(current)) {
             return false;
         }
-        if (previous != NA_REAL && previous != current + 1) {
+        if (!ISNAN(previous) && previous != current + 1) {
             return false;
         }
         previous = current;
@@ -163,7 +163,7 @@ bool do_numeric_indices_contain_NAs(SEXP/*REALSXP*/ indices) {
     assert(TYPEOF(indices) == REALSXP);
     R_xlen_t size = XLENGTH(indices);
     for (int i = 0; i < size; i++) {
-        if (REAL_ELT(indices, i) == NA_REAL) {
+        if (ISNAN(REAL_ELT(indices, i))) {
             return false;
         }
     }
@@ -204,7 +204,7 @@ void copy_element(SEXP source, R_xlen_t source_index, SEXP target, R_xlen_t targ
            || TYPEOF(source) == STRSXP);
 
     switch(TYPEOF(source)) {
-        case INTSXP:  SET_INTEGER_ELT (target, target_index, INTEGER_ELT (source, source_index)); break;                // FIXME Invalid write of size 4
+        case INTSXP:  SET_INTEGER_ELT (target, target_index, INTEGER_ELT (source, source_index)); break;
         case REALSXP: SET_REAL_ELT    (target, target_index, REAL_ELT    (source, source_index)); break;
         case LGLSXP:  SET_LOGICAL_ELT (target, target_index, LOGICAL_ELT (source, source_index)); break;
         case CPLXSXP: SET_COMPLEX_ELT (target, target_index, COMPLEX_ELT (source, source_index)); break;
@@ -220,8 +220,6 @@ void set_element_to_NA(SEXP target, R_xlen_t target_index) {
            || TYPEOF(target) == REALSXP
            || TYPEOF(target) == CPLXSXP
            || TYPEOF(target) == LGLSXP
-         //|| TYPEOF(target) == VECSXP
-         //|| TYPEOF(target) == RAWSXP
            || TYPEOF(source) == STRSXP);
 
     switch(TYPEOF(target)) {
@@ -255,24 +253,35 @@ SEXP copy_data_at_indices(SEXP source, SEXP/*INTSXP | REALSXP*/ indices) {
     assert(type == INTSXP || type == REALSXP);
 
     R_xlen_t size = XLENGTH(indices);
-    SEXP target = allocVector(type, size);
+    SEXP target = allocVector(TYPEOF(source), size);
 
     switch (type) {
         case INTSXP:  {
             for (R_xlen_t i = 0; i < size; i++) {
-                int index = INTEGER_ELT(indices, i) - 1;
-                copy_element(source, (R_xlen_t) index, target, i);
+                int index = INTEGER_ELT(indices, i);
+                if (index == NA_INTEGER) {
+                	set_element_to_NA(target, i);
+                } else {
+                	copy_element(source, ((R_xlen_t) index) - 1, target, i);
+                }
             }
             break;
         }
+
         case REALSXP: {
             for (R_xlen_t i = 0; i < size; i++) {
-                double index = REAL_ELT(indices, i) - 1;
-                copy_element(source, (R_xlen_t) index, target, i);
+                double index = REAL_ELT(indices, i);
+                if (ISNAN(index)) {
+                  	set_element_to_NA(target, i);
+                } else {
+                    copy_element(source, ((R_xlen_t) index) - 1, target, i);
+                }
             }
             break;
         }
-        default:      Rf_error("Unsupported vector type: %d\n", type);
+
+        default:
+        	Rf_error("Unsupported vector type: %d\n", type);
     }
 
     return target;

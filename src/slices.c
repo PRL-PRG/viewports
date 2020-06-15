@@ -590,45 +590,7 @@ static R_xlen_t slice_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *bu
     return LOGICAL_GET_REGION(source, projected_index, n, buf);
 }
 
-
-//SEXP copy_data_at_integer_indices(SEXP source, SEXP/*INTSXP*/ indices) {
-//    assert(TYPEOF(indices) == INTSXP);
-//
-//    R_xlen_t size = XLENGTH(indices);
-//    SEXP target = allocVector(TYPEOF(source), size);
-//
-//    for (R_xlen_t i = 0; i < size; i++) {
-//        int index = INTEGER_ELT(indices, i);
-//        copy_element(source, (R_xlen_t) index, target, i);
-//    }
-//
-//    return target;
-//}
-//
-//SEXP copy_data_at_numeric_indices(SEXP source, SEXP/*REALSXP*/ indices) {
-//    R_xlen_t size = XLENGTH(indices);
-//    SEXP target = allocVector(TYPEOF(source), size);
-//
-//    for (R_xlen_t i = 0; i < size; i++) {
-//        double index = REAL_ELT(indices, i);
-//        copy_element(source, (R_xlen_t) index, target, i);
-//    }
-//
-//    return target;
-//}
-//
-////SEXP copy_data_at_indices(SEXP source, SEXP/*INTSXP | REALSXP*/ indices) {
-////    SEXPTYPE type = TYPEOF(indices);
-////    assert(type == INTSXP || type == REALSXP);
-////
-////    switch (type) {
-////        case INTSXP:  return copy_data_at_integer_indices(source, indices);
-////        case REALSXP: return copy_data_at_numeric_indices(source, indices);
-////        default:      Rf_error("Slices can be indexed by integer or numeric vectors but found: %d\n", type);
-////    }
-////}
-
-SEXP translate_indices(SEXP original, R_xlen_t offset) {
+SEXP translate_indices(SEXP original, R_xlen_t offset, R_xlen_t size) {
 	assert(TYPEOF(original) == INTSXP || TYPEOF(original) == REALSXP);
 	assert(sizeof(R_xlen_t) <= sizeof(double));
 
@@ -638,7 +600,7 @@ SEXP translate_indices(SEXP original, R_xlen_t offset) {
 	case INTSXP:
 		for (R_xlen_t i = 0; i < XLENGTH(translated); i++) {
 			int original_element = INTEGER_ELT(original, i);
-			if (original_element == NA_INTEGER) {
+			if (original_element == NA_INTEGER || ((R_xlen_t) original_element) > size) {
 				SET_REAL_ELT(translated, i, NA_REAL);
 			} else {
 				SET_REAL_ELT(translated, i, ((R_xlen_t) original_element) + offset);
@@ -648,8 +610,8 @@ SEXP translate_indices(SEXP original, R_xlen_t offset) {
 
 	case REALSXP:
 		for (R_xlen_t i = 0; i < XLENGTH(translated); i++) {
-			int original_element = REAL_ELT(original, i);
-			if (original_element == NA_REAL) {
+			double original_element = REAL_ELT(original, i);
+			if (ISNAN(original_element) || original_element > size) {
 				SET_REAL_ELT(translated, i, NA_REAL);
 			} else {
 				SET_REAL_ELT(translated, i, ((R_xlen_t) original_element) + offset);
@@ -684,27 +646,25 @@ static SEXP slice_extract_subset(SEXP x, SEXP indices, SEXP call) {
         return allocVector(TYPEOF(source), 0);
     }
 
-    if (is_materialized(x)) {
-        return copy_data_at_indices(source, indices);
-    }
-
     R_xlen_t window_start = 0;
     R_xlen_t window_size  = 0;
     read_start_and_size(window, &window_start, &window_size);
 
+    if (is_materialized(x)) {
+            return copy_data_at_indices(source, indices);
+        }
+
     if (!are_indices_in_range(indices, 1, window_size)) {
-    	SEXP translated_indices = translate_indices(indices, window_start);
+    	SEXP translated_indices = translate_indices(indices, window_start, window_size);
     	return copy_data_at_indices(source, translated_indices);
     }
 
     if (!are_indices_contiguous(indices)) {
-    	SEXP translated_indices = translate_indices(indices, window_start);
+    	SEXP translated_indices = translate_indices(indices, window_start, window_size);
         if (are_indices_monotonic(indices)) {
         	return create_mosaic(source, translated_indices);
-        	//Rf_error("Mosaics of slices are not implemented yet.\n"); // FIXME
         } else {
         	return create_prism(source, translated_indices);
-        	//Rf_error("Prisms of slices are not implemented yet.\n"); // FIXME
         }
     }
 
