@@ -56,8 +56,8 @@ test_that("write to mosaic", {
 })
 
 test_that("check range", {
-    source <- 1:100
-    expect_error(mosaic(source, 200:400))
+     source <- 1:100
+     expect_error(mosaic(source, 200:400))
 })
 
 test_that("dereference out of range", {

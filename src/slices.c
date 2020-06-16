@@ -63,8 +63,9 @@ void read_start_and_size(SEXP/*INTSXP*/ window, R_xlen_t *start, R_xlen_t *size)
 
 SEXP slice_new(SEXP source, R_xlen_t start, R_xlen_t size) {
     make_sure(TYPEOF(source) == INTSXP || TYPEOF(source) == REALSXP || TYPEOF(source) == CPLXSXP
-           || TYPEOF(source) == LGLSXP || TYPEOF(source) == VECSXP  || TYPEOF(source) == STRSXP, Rf_error,
-		      "type of source should be one of INTSXP, REALSXP, CPLXSXP, LGLSXP, VECSXP, or STRSXP");
+           || TYPEOF(source) == LGLSXP || TYPEOF(source) == VECSXP  || TYPEOF(source) == STRSXP
+		   || TYPEOF(source) == RAWSXP, Rf_error,
+		      "type of source should be one of INTSXP, REALSXP, CPLXSXP, LGLSXP, VECSXP, RAWSXP, or STRSXP");
 
     make_sure(start < XLENGTH(source), Rf_error, "start cannot be greater than length of source");
     make_sure(start + size <= XLENGTH(source), Rf_error, "viewport must fit within the length of source");

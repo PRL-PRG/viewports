@@ -113,14 +113,49 @@ R_xlen_t convert_indices_to_bitmap(SEXP/*INTSXP | REALSXP | LGLSXP*/ indices, SE
     }
 }
 
+bool indices_can_be_applied_to_source(SEXP source, SEXP/*INTSXP|REALSXP|LGLSXP*/ indices) {
+	SEXPTYPE type = TYPEOF(indices);
+	R_xlen_t indices_length = XLENGTH(indices);
+	R_xlen_t source_length = XLENGTH(source);
+
+	switch(type) {
+	case INTSXP: {
+		for (R_xlen_t i = 0; i < indices_length; i++) {
+			R_xlen_t index = (R_xlen_t) INTEGER_ELT(indices, i);
+			if (source_length < index) {
+				return false;
+			}
+		}
+		return true;
+	}
+	case REALSXP: {
+		for (R_xlen_t i = 0; i < indices_length; i++) {
+			R_xlen_t index = (R_xlen_t) REAL_ELT(indices, i);
+			if (source_length < index) {
+				return false;
+			}
+		}
+		return true;
+	}
+	case LGLSXP: {
+		return indices_length == source_length;
+	}
+	default: {
+		Rf_error("Unreachable");
+		return false;
+	}
+	}
+}
+
 SEXP/*A*/ mosaic_new(SEXP/*A*/ source, SEXP/*INTSXP*/ bitmap, R_xlen_t size) {
     make_sure(TYPEOF(source) == INTSXP
            || TYPEOF(source) == REALSXP
+		   || TYPEOF(source) == RAWSXP
            || TYPEOF(source) == CPLXSXP
            || TYPEOF(source) == LGLSXP
            || TYPEOF(source) == VECSXP
            || TYPEOF(source) == STRSXP, Rf_error,
-		      "type of indices must be one of INTSXP, REALSXP, or LGLSXP, CPLXSXP, VECSXP, or STRSXP");
+		      "type of indices must be one of INTSXP, REALSXP, RAWSXP, LGLSXP, CPLXSXP, VECSXP, or STRSXP");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_new\n");
@@ -709,23 +744,25 @@ void init_mosaic_altrep_class(DllInfo * dll) {
     init_raw_mosaic(dll);
 }
 
-
 SEXP/*A*/ create_mosaic(SEXP/*A*/ source, SEXP/*INTSXP|REALSXP|LGLSXP*/ indices) {
-
     make_sure(TYPEOF(source) == INTSXP
            || TYPEOF(source) == REALSXP
            || TYPEOF(source) == CPLXSXP
            || TYPEOF(source) == LGLSXP
+		   || TYPEOF(source) == RAWSXP
            || TYPEOF(source) == VECSXP
            || TYPEOF(source) == STRSXP, Rf_error,
-		      "type of source must be one of INTSXP, REALSXP, CPLXSXP, LGLSXP, VECSXP, or STRSXP");
-
+		      "type of source must be one of INTSXP, REALSXP, RAWSXP, CPLXSXP, LGLSXP, VECSXP, or STRSXP");
 
     make_sure(TYPEOF(indices) == INTSXP
            || TYPEOF(indices) == REALSXP
-           || (TYPEOF(indices) == LGLSXP && (XTRUELENGTH(indices) == XLENGTH(source))), Rf_error,
+           || (TYPEOF(indices) == LGLSXP && (XLENGTH(indices) == XLENGTH(source))), Rf_error,
         	  "type of indices must be either INTSXP or REALSXP or LGLSXP "
         	  "(if it is LGLSXP, the length of indices must be the same as the source)");
+
+    if (!indices_can_be_applied_to_source(source, indices)) {
+    	Rf_error("Cannot use these indices with this source: out of range");
+    }
 
     if (get_debug_mode()) {
         Rprintf("mosaic_new\n");
