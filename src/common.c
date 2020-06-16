@@ -324,3 +324,36 @@ viewport_type_t recommend_vieport_type_for_indices(SEXP/*INTSXP | REALSXP*/ indi
     make_sure(false, Rf_error, "not implemented"); //FIXME
     return VIEWPORT_NONE;
 }
+
+SEXP/*REALSXP*/ screen_indices(SEXP/*INTSXP|REALSXP*/ original, R_xlen_t size) {
+	SEXP translated = allocVector(REALSXP, XLENGTH(original)); // FIXME translation altrep vector
+
+	switch (TYPEOF(original)) {
+	case INTSXP:
+		for (R_xlen_t i = 0; i < XLENGTH(translated); i++) {
+			int original_element = INTEGER_ELT(original, i);
+			if (((R_xlen_t) original_element) > size) {
+				SET_REAL_ELT(translated, i, NA_REAL);
+			} else {
+				SET_REAL_ELT(translated, i, original_element);
+			}
+		}
+		break;
+
+	case REALSXP:
+		for (R_xlen_t i = 0; i < XLENGTH(translated); i++) {
+			double original_element = REAL_ELT(original, i);
+			if (((R_xlen_t) original_element) > size) {
+				SET_REAL_ELT(translated, i, NA_REAL);
+			} else {
+				SET_REAL_ELT(translated, i, original_element);
+			}
+		}
+		break;
+
+	default:
+		Rf_error("Indices are expected to be either INTSXP or REALSXP");
+	}
+
+	return translated;
+}

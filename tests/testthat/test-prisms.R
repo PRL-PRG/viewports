@@ -50,16 +50,16 @@ test_that("check range", {
 
 test_that("dereference out of range", {
     source <- 1:100
-    viewport <- prism(source, 10, 10)
+    viewport <- prism(source, 10:20)
 
-    expect_equal(viewport[100], NA)
+    expect_equal(viewport[100], as.integer(NA))
 })
 
 test_that("region partially out of range", {
     source <- 1:100
-    viewport <- prism(source, 10:20)
+    viewport <- prism(source, 10:19)
 
-    expect_equal(viewport[5:10], c(14,15,16,17,18,19,20,NA,NA,NA,NA))
+    expect_equal(viewport[5:15], c(14,15,16,17,18,19,NA,NA,NA,NA,NA))
 })
 
 test_that("integer test", {
@@ -71,8 +71,8 @@ test_that("integer test", {
 
     expect_equal(viewport[1], 4)
     expect_equal(viewport[2], 5)
-    expect_equal(viewport[3], 6)
-    expect_equal(viewport[4], 7)
+    expect_equal(viewport[3], 7)
+    expect_equal(viewport[4], 6)
 })
 
 test_that("numeric test", {

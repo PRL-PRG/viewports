@@ -113,40 +113,6 @@ R_xlen_t convert_indices_to_bitmap(SEXP/*INTSXP | REALSXP | LGLSXP*/ indices, SE
     }
 }
 
-bool indices_can_be_applied_to_source(SEXP source, SEXP/*INTSXP|REALSXP|LGLSXP*/ indices) {
-	SEXPTYPE type = TYPEOF(indices);
-	R_xlen_t indices_length = XLENGTH(indices);
-	R_xlen_t source_length = XLENGTH(source);
-
-	switch(type) {
-	case INTSXP: {
-		for (R_xlen_t i = 0; i < indices_length; i++) {
-			R_xlen_t index = (R_xlen_t) INTEGER_ELT(indices, i);
-			if (source_length < index) {
-				return false;
-			}
-		}
-		return true;
-	}
-	case REALSXP: {
-		for (R_xlen_t i = 0; i < indices_length; i++) {
-			R_xlen_t index = (R_xlen_t) REAL_ELT(indices, i);
-			if (source_length < index) {
-				return false;
-			}
-		}
-		return true;
-	}
-	case LGLSXP: {
-		return indices_length == source_length;
-	}
-	default: {
-		Rf_error("Unreachable");
-		return false;
-	}
-	}
-}
-
 SEXP/*A*/ mosaic_new(SEXP/*A*/ source, SEXP/*INTSXP*/ bitmap, R_xlen_t size) {
     make_sure(TYPEOF(source) == INTSXP
            || TYPEOF(source) == REALSXP
@@ -552,39 +518,6 @@ static R_xlen_t mosaic_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *b
     return LOGICAL_GET_REGION(data, i, n, buf);
 }
 
-SEXP/*REALSXP*/ screen_indices(SEXP/*INTSXP|REALSXP*/ original, R_xlen_t size) {
-	SEXP translated = allocVector(REALSXP, XLENGTH(original)); // FIXME translation altrep vector
-
-	switch (TYPEOF(original)) {
-	case INTSXP:
-		for (R_xlen_t i = 0; i < XLENGTH(translated); i++) {
-			int original_element = INTEGER_ELT(original, i);
-			if (((R_xlen_t) original_element) > size) {
-				SET_REAL_ELT(translated, i, NA_REAL);
-			} else {
-				SET_REAL_ELT(translated, i, original_element);
-			}
-		}
-		break;
-
-	case REALSXP:
-		for (R_xlen_t i = 0; i < XLENGTH(translated); i++) {
-			double original_element = REAL_ELT(original, i);
-			if (((R_xlen_t) original_element) > size) {
-				SET_REAL_ELT(translated, i, NA_REAL);
-			} else {
-				SET_REAL_ELT(translated, i, original_element);
-			}
-		}
-		break;
-
-	default:
-		Rf_error("Indices are expected to be either INTSXP or REALSXP");
-	}
-
-	return translated;
-}
-
 SEXP/*REALSXP*/ translate_indices_by_bitmap(SEXP/*REALSXP*/ screened_indices, SEXP/*bitmap*/ bitmap) {
     make_sure(TYPEOF(screened_indices) == REALSXP, Rf_error, "type of screened_indices must be REALSXP");
     make_sure(TYPEOF(bitmap) == INTSXP, Rf_error, "type of bitmap must be INTSXP");
@@ -745,34 +678,34 @@ void init_mosaic_altrep_class(DllInfo * dll) {
 }
 
 SEXP/*A*/ create_mosaic(SEXP/*A*/ source, SEXP/*INTSXP|REALSXP|LGLSXP*/ indices) {
-    make_sure(TYPEOF(source) == INTSXP
-           || TYPEOF(source) == REALSXP
-           || TYPEOF(source) == CPLXSXP
-           || TYPEOF(source) == LGLSXP
-		   || TYPEOF(source) == RAWSXP
-           || TYPEOF(source) == VECSXP
-           || TYPEOF(source) == STRSXP, Rf_error,
+	SEXPTYPE source_type = TYPEOF(source);
+	SEXPTYPE indices_type = TYPEOF(indices);
+	R_xlen_t source_length = XLENGTH(source);
+	R_xlen_t indices_length = XLENGTH(indices);
+
+    make_sure(source_type == INTSXP || source_type == REALSXP || source_type == CPLXSXP
+           || source_type == LGLSXP || source_type == RAWSXP  || source_type == VECSXP
+           || source_type == STRSXP, Rf_error,
 		      "type of source must be one of INTSXP, REALSXP, RAWSXP, CPLXSXP, LGLSXP, VECSXP, or STRSXP");
 
-    make_sure(TYPEOF(indices) == INTSXP
-           || TYPEOF(indices) == REALSXP
-           || (TYPEOF(indices) == LGLSXP && (XLENGTH(indices) == XLENGTH(source))), Rf_error,
+    make_sure(indices_type == INTSXP  || indices_type == REALSXP
+           || (indices_type == LGLSXP && (indices_length == source_length)), Rf_error,
         	  "type of indices must be either INTSXP or REALSXP or LGLSXP "
         	  "(if it is LGLSXP, the length of indices must be the same as the source)");
 
-    if (!indices_can_be_applied_to_source(source, indices)) {
-    	Rf_error("Cannot use these indices with this source: out of range");
-    }
+    if (indices_type == INTSXP || indices_type == REALSXP)
+    	if (!are_indices_in_range(indices, 0, source_length))
+    		Rf_error("Cannot use these indices with this source: out of range");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_new\n");
         Rprintf("           SEXP: %p\n", source);
         Rprintf("        indices: %p\n", indices);
-        Rprintf("   indices type: %li\n", TYPEOF(indices));
-        Rprintf(" indices length: %li\n", XLENGTH(indices));
+        Rprintf("   indices type: %li\n", indices_type);
+        Rprintf(" indices length: %li\n", indices_length);
     }
 
-    SEXP/*INTSXP*/ bitmap = bitmap_new(XLENGTH(source));
+    SEXP/*INTSXP*/ bitmap = bitmap_new(source_length);
     R_xlen_t how_many_set_bits = convert_indices_to_bitmap(indices, bitmap);
     return mosaic_new(source, bitmap, how_many_set_bits);
 }

@@ -60,6 +60,10 @@ static inline SEXP/*INTSXP|REALSXP*/ get_indices(SEXP x) {
     return R_altrep_data1(x);
 }
 
+static inline R_xlen_t get_length(SEXP x) {
+	return XLENGTH(get_indices(x));
+}
+
 static inline SEXP get_source(SEXP x) {
     SEXP/*LISTSXP*/ cell =  R_altrep_data2(x);
     return CAR(cell);
@@ -128,7 +132,7 @@ static R_xlen_t prism_length(SEXP x) {
         Rprintf("           SEXP: %p\n", x);
     }
 
-    return XLENGTH(get_indices(x));
+    return get_length(x);
 }
 
 static void *prism_dataptr(SEXP x, Rboolean writeable) {
@@ -178,9 +182,9 @@ static inline R_xlen_t translate_index(SEXP/*INTSXP|REALSXP*/ indices, R_xlen_t 
     make_sure(type == REALSXP || type == INTSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
 
     if (type == REALSXP) {
-        return (R_xlen_t) REAL_ELT   (indices, index - 1);
+        return (R_xlen_t) REAL_ELT   (indices, index);
     } else {
-        return (R_xlen_t) INTEGER_ELT(indices, index - 1);
+        return (R_xlen_t) INTEGER_ELT(indices, index);
     }
 }
 
@@ -203,7 +207,7 @@ static int prism_integer_element(SEXP x, R_xlen_t i) {
     SEXP/*INTSXP|REALSXP*/ indices = get_indices(x);
     SEXP/*INTSXP*/         source  = get_source(x);
 
-    R_xlen_t projected_index = translate_index(indices, i);
+    R_xlen_t projected_index = translate_index(indices, i) - 1;
 
     if (get_debug_mode()) {
         Rprintf("projected_index: %li\n", projected_index);
@@ -232,7 +236,7 @@ static double prism_numeric_element(SEXP x, R_xlen_t i) {
     SEXP/*INTSXP|REALSXP*/ indices = get_indices(x);
     SEXP/*REALSXP*/        source  = get_source(x);
 
-    R_xlen_t projected_index = translate_index(indices, i);
+    R_xlen_t projected_index = translate_index(indices, i) - 1;
 
     if (get_debug_mode()) {
         Rprintf("projected_index: %li\n", projected_index);
@@ -261,7 +265,7 @@ static Rbyte prism_raw_element(SEXP x, R_xlen_t i) {
     SEXP/*INTSXP|REALSXP*/ indices = get_indices(x);
     SEXP/*RAWSXP*/         source  = get_source(x);
 
-    R_xlen_t projected_index = translate_index(indices, i);
+    R_xlen_t projected_index = translate_index(indices, i) - 1;
 
     if (get_debug_mode()) {
         Rprintf("projected_index: %li\n", projected_index);
@@ -290,7 +294,7 @@ static Rcomplex prism_complex_element(SEXP x, R_xlen_t i) {
     SEXP/*INTSXP|REALSXP*/ indices = get_indices(x);
     SEXP/*CPLXSXP*/        source  = get_source(x);
 
-    R_xlen_t projected_index = translate_index(indices, i);
+    R_xlen_t projected_index = translate_index(indices, i) - 1;
 
     if (get_debug_mode()) {
         Rprintf("projected_index: %li\n", projected_index);
@@ -319,7 +323,7 @@ static int prism_logical_element(SEXP x, R_xlen_t i) {
     SEXP/*INTSXP|REALSXP*/ indices = get_indices(x);
     SEXP/*LGLSXP*/         source  = get_source(x);
 
-    R_xlen_t projected_index = translate_index(indices, i);
+    R_xlen_t projected_index = translate_index(indices, i) - 1;
 
     if (get_debug_mode()) {
         Rprintf("projected_index: %li\n", projected_index);
@@ -454,6 +458,38 @@ static R_xlen_t prism_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *bu
     return LOGICAL_GET_REGION(data, i, n, buf);
 }
 
+SEXP/*REALSXP*/ map_indices_onto_source(SEXP/*INTSXP|REALSXP*/ indices, SEXP/*INTSXP|REALSXP*/ prism_indices, R_xlen_t size) {
+	SEXP translated_indices = allocVector(REALSXP, size);
+
+	switch (TYPEOF(indices)) {
+	        case INTSXP:
+	            for (R_xlen_t i = 0; i < size; i++) {
+	                int index = INTEGER_ELT(indices, i);
+	                if (index == NA_INTEGER) {
+	                	SET_REAL_ELT(translated_indices, i, NA_REAL);
+	                	continue;
+	                }
+	                R_xlen_t translated_index = translate_index(prism_indices, ((R_xlen_t) index) - 1);
+	                SET_REAL_ELT(translated_indices, i, translated_index);
+	            }
+	            break;
+
+	        case REALSXP:
+	            for (R_xlen_t i = 0; i < size; i++) {
+	                double index = REAL_ELT(indices, i);
+	                if (ISNAN(index)) {
+	                	SET_REAL_ELT(translated_indices, i, NA_REAL);
+	                	continue;
+	                }
+	                R_xlen_t translated_index = translate_index(prism_indices, ((R_xlen_t) index) - 1);
+	                SET_REAL_ELT(translated_indices, i, translated_index);
+	            }
+	            break;
+	    }
+
+	return translated_indices;
+}
+
 static SEXP prism_extract_subset(SEXP x, SEXP indices, SEXP call) {
 	make_sure(x != NULL, Rf_error, "x must not be null");
     make_sure(TYPEOF(indices) == REALSXP || TYPEOF(indices) == INTSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
@@ -468,6 +504,7 @@ static SEXP prism_extract_subset(SEXP x, SEXP indices, SEXP call) {
 
     SEXP/*INTSXP|REALSXP*/ prism_indices = get_indices(x);
     SEXP                   source        = get_source(x);
+    R_xlen_t       		   length        = get_length(x);
 
     // No indices.
     R_xlen_t size = XLENGTH(indices);
@@ -475,38 +512,22 @@ static SEXP prism_extract_subset(SEXP x, SEXP indices, SEXP call) {
         return allocVector(TYPEOF(source), 0);
     }
 
+    SEXP/*REALSXP*/ screened_indices = screen_indices(indices, length);
+
     if (is_materialized(x)) {
         // TODO maybe instead just return a viewport into the materialized sexp?
         SEXP materialized_data = get_materialized_data(x);
-        return copy_data_at_indices(materialized_data, indices);
+        return copy_data_at_indices(materialized_data, screened_indices);
     }
 
-    if (!do_indices_contain_NAs(indices)) {
-        Rf_error("Non-NA prisms are not implemented yet.\n"); // FIXME
+    if (!do_indices_contain_NAs(screened_indices)) {
+    	SEXP/*REALSXP*/ translated_indices = map_indices_onto_source(screened_indices, prism_indices, size);
+    	return copy_data_at_indices(source, translated_indices);
     }
 
     // Non-NA indices.
-    SEXP translated_indices = allocVector(REALSXP, size);
-
-    switch (TYPEOF(indices)) {
-        case INTSXP:
-            for (R_xlen_t i = 0; i < size; i++) {
-                R_xlen_t index = (R_xlen_t) INTEGER_ELT(indices, i);
-                R_xlen_t translated_index = translate_index(prism_indices, index);
-                SET_REAL_ELT(translated_indices, i, translated_index);
-            }
-            break;
-
-        case REALSXP:
-            for (R_xlen_t i = 0; i < size; i++) {
-                R_xlen_t index = (R_xlen_t) REAL_ELT(indices, i);
-                R_xlen_t translated_index = translate_index(prism_indices, index);
-                SET_REAL_ELT(translated_indices, i, translated_index);
-            }
-            break;
-    }
-
-    return prism_new(source, indices);
+    SEXP translated_indices = map_indices_onto_source(indices, prism_indices, size);
+    return prism_new(source, translated_indices);
 }
 
 // R_set_altstring_Set_elt_method
@@ -536,7 +557,7 @@ void init_integer_prism(DllInfo * dll) {
 }
 
 void init_numeric_prism(DllInfo * dll) {
-    R_altrep_class_t cls = R_make_altinteger_class("prism_numeric_altrep", "viewports", dll);
+    R_altrep_class_t cls = R_make_altreal_class("prism_numeric_altrep", "viewports", dll);
     prism_numeric_altrep = cls;
 
     init_common_prism(cls);
@@ -546,7 +567,7 @@ void init_numeric_prism(DllInfo * dll) {
 }
 
 void init_logical_prism(DllInfo * dll) {
-    R_altrep_class_t cls = R_make_altinteger_class("prism_logical_altrep", "viewports", dll);
+    R_altrep_class_t cls = R_make_altlogical_class("prism_logical_altrep", "viewports", dll);
     prism_logical_altrep = cls;
 
     init_common_prism(cls);
@@ -556,7 +577,7 @@ void init_logical_prism(DllInfo * dll) {
 }
 
 void init_complex_prism(DllInfo * dll) {
-    R_altrep_class_t cls = R_make_altinteger_class("prism_complex_altrep", "viewports", dll);
+    R_altrep_class_t cls = R_make_altcomplex_class("prism_complex_altrep", "viewports", dll);
     prism_complex_altrep = cls;
 
     init_common_prism(cls);
@@ -566,7 +587,7 @@ void init_complex_prism(DllInfo * dll) {
 }
 
 void init_raw_prism(DllInfo * dll) {
-    R_altrep_class_t cls = R_make_altinteger_class("prism_raw_altrep", "viewports", dll);
+    R_altrep_class_t cls = R_make_altraw_class("prism_raw_altrep", "viewports", dll);
     prism_raw_altrep = cls;
 
     init_common_prism(cls);
@@ -584,8 +605,21 @@ void init_prism_altrep_class(DllInfo * dll) {
 }
 
 SEXP create_prism(SEXP source, SEXP/*INTSXP|REALSXP*/ indices) {
-	make_sure(TYPEOF(indices) == REALSXP || TYPEOF(indices) == INTSXP, Rf_error,
+	SEXPTYPE source_type = TYPEOF(source);
+	SEXPTYPE indices_type = TYPEOF(indices);
+	R_xlen_t source_length = XLENGTH(source);
+	//R_xlen_t indices_length = XLENGTH(indices);
+
+	make_sure(source_type == INTSXP || source_type == REALSXP || source_type == CPLXSXP
+	           || source_type == LGLSXP || source_type == RAWSXP  || source_type == VECSXP
+	           || source_type == STRSXP, Rf_error,
+			      "type of source must be one of INTSXP, REALSXP, RAWSXP, CPLXSXP, LGLSXP, VECSXP, or STRSXP");
+
+	make_sure(indices_type == REALSXP || indices_type == INTSXP, Rf_error,
 			  "type of indices should be either INTSXP or REALSXP");
+
+  	if (!are_indices_in_range(indices, 0, source_length))
+    		Rf_error("Cannot use these indices with this source: out of range");
 
     if (get_debug_mode()) {
         Rprintf("create prism\n");
