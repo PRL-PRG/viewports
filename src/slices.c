@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <stdbool.h>
 
 #define USE_RINTERNALS
@@ -15,6 +14,9 @@
 #include "common.h"
 #include "mosaics.h"
 #include "prisms.h"
+
+#define MAKE_SURE
+#include "make_sure.h"
 
 #ifndef NA_RAW
 #define NA_RAW 0
@@ -60,16 +62,12 @@ void read_start_and_size(SEXP/*INTSXP*/ window, R_xlen_t *start, R_xlen_t *size)
 }
 
 SEXP slice_new(SEXP source, R_xlen_t start, R_xlen_t size) {
+    make_sure(TYPEOF(source) == INTSXP || TYPEOF(source) == REALSXP || TYPEOF(source) == CPLXSXP
+           || TYPEOF(source) == LGLSXP || TYPEOF(source) == VECSXP  || TYPEOF(source) == STRSXP, Rf_error,
+		      "type of source should be one of INTSXP, REALSXP, CPLXSXP, LGLSXP, VECSXP, or STRSXP");
 
-    assert(TYPEOF(source) == INTSXP
-        || TYPEOF(source) == REALSXP
-        || TYPEOF(source) == CPLXSXP
-        || TYPEOF(source) == LGLSXP
-        || TYPEOF(source) == VECSXP
-        || TYPEOF(source) == STRSXP);
-
-    assert(start < XLENGTH(source));
-    assert(start + size <= XLENGTH(source));
+    make_sure(start < XLENGTH(source), Rf_error, "start cannot be greater than length of source");
+    make_sure(start + size <= XLENGTH(source), Rf_error, "viewport must fit within the length of source");
 
     if (get_debug_mode()) {
         Rprintf("slice_new\n");
@@ -220,12 +218,12 @@ const void *extract_read_only_data_pointer(SEXP x) {
         default: Rf_error("Illegal source type for a slice: %i.\n", type);
     }
 
-    assert(false);
+    make_sure(false, Rf_error, "unreachable");
     return NULL;
 }
 
 static void *slice_dataptr(SEXP x, Rboolean writeable) {
-    assert(x != NULL);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     if (get_debug_mode()) {
         Rprintf("slice_dataptr\n");
@@ -256,7 +254,7 @@ static void *slice_dataptr(SEXP x, Rboolean writeable) {
 }
 
 static const void *slice_dataptr_or_null(SEXP x) {
-    assert(x != NULL);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     if (get_debug_mode()) {
         Rprintf("slice_dataptr_or_null\n");
@@ -267,13 +265,13 @@ static const void *slice_dataptr_or_null(SEXP x) {
 }
 
 R_xlen_t project_index(SEXP/*INTSXP*/ window, R_xlen_t index) {
-    assert(window != R_NilValue);
+	make_sure(window != NULL && window != R_NilValue, Rf_error, "window cannot be null");
 
     R_xlen_t start = 0;
     R_xlen_t size  = 0;
     read_start_and_size(window, &start, &size);
 
-    assert(index < size);
+    make_sure(index < size, Rf_error, "index out of range");
     R_xlen_t projected_index = start + index;
 
     if (get_debug_mode()) {
@@ -296,12 +294,12 @@ static inline bool index_within_bounds(SEXP window, R_xlen_t index) {
 }
 
 static int slice_integer_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     SEXP/*INTSXP*/ window = get_window(x);
     SEXP/*INTSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == INTSXP);
+    make_sure(TYPEOF(source) == INTSXP, Rf_error, "type of source must be INTSXP");
 
     if (get_debug_mode()) {
         Rprintf("slice_integer_element\n");
@@ -313,7 +311,7 @@ static int slice_integer_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*INTSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == INTSXP);
+        make_sure(TYPEOF(data) == INTSXP, Rf_error, "type of data must be INTSXP");
         return INTEGER_ELT(data, i);
     }
 
@@ -327,12 +325,12 @@ static int slice_integer_element(SEXP x, R_xlen_t i) {
 }
 
 static double slice_numeric_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     SEXP/*INTSXP*/  window = get_window(x);
     SEXP/*CPLXSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == REALSXP);
+    make_sure(TYPEOF(source) == REALSXP, Rf_error, "type of source must be REALSXP");
 
     if (get_debug_mode()) {
         Rprintf("slice_numeric_element\n");
@@ -344,7 +342,7 @@ static double slice_numeric_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*REALSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == REALSXP);
+        make_sure(TYPEOF(data) == REALSXP, Rf_error, "type of data must be REALSXP");
         return REAL_ELT(data, i);
     }
 
@@ -358,12 +356,12 @@ static double slice_numeric_element(SEXP x, R_xlen_t i) {
 }
 
 static Rbyte slice_raw_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     SEXP/*INTSXP*/  window = get_window(x);
     SEXP/*CPLXSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == RAWSXP);
+    make_sure(TYPEOF(source) == RAWSXP, Rf_error, "type of source must be RAWSXP");
 
     if (get_debug_mode()) {
         Rprintf("slice_raw_element\n");
@@ -375,7 +373,7 @@ static Rbyte slice_raw_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*RAWSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == RAWSXP);
+        make_sure(TYPEOF(data) == RAWSXP, Rf_error, "type of data must be RAWSXP");
         return RAW_ELT(data, i);
     }
 
@@ -389,12 +387,12 @@ static Rbyte slice_raw_element(SEXP x, R_xlen_t i) {
 }
 
 static Rcomplex slice_complex_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     SEXP/*INTSXP*/  window = get_window(x);
     SEXP/*CPLXSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == CPLXSXP);
+    make_sure(TYPEOF(source) == CPLXSXP, Rf_error, "type of source must be CPLXSXP");
 
     if (get_debug_mode()) {
         Rprintf("slice_complex_element\n");
@@ -406,7 +404,7 @@ static Rcomplex slice_complex_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*CPLXSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == CPLXSXP);
+        make_sure(TYPEOF(data) == CPLXSXP, Rf_error, "type of data must be CPLXSXP");
         return COMPLEX_ELT(data, i);
     }
 
@@ -425,12 +423,12 @@ static Rcomplex slice_complex_element(SEXP x, R_xlen_t i) {
 }
 
 static int slice_logical_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     SEXP/*INTSXP*/ window = get_window(x);
     SEXP/*LGLSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == LGLSXP);
+    make_sure(TYPEOF(source) == LGLSXP, Rf_error, "type of source must be LGLSXP");
 
     if (get_debug_mode()) {
         Rprintf("slice_logical_element\n");
@@ -442,7 +440,7 @@ static int slice_logical_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*LGLSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == LGLSXP);
+        make_sure(TYPEOF(data) == LGLSXP, Rf_error, "type of data must be LGLSXP");
         return LOGICAL_ELT(data, i);
     }
 
@@ -456,7 +454,7 @@ static int slice_logical_element(SEXP x, R_xlen_t i) {
 }
 
 static R_xlen_t slice_integer_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     if (get_debug_mode()) {
         Rprintf("slice_integer_get_region\n");
@@ -468,14 +466,14 @@ static R_xlen_t slice_integer_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *bu
 
     if (is_materialized(x)) {
         SEXP/*INTSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == INTSXP);
+        make_sure(TYPEOF(data) == INTSXP, Rf_error, "type of data must be INTSXP");
         return INTEGER_GET_REGION(data, i, n, buf);
     }
 
     SEXP/*INTSXP*/ window = get_window(x);
     SEXP/*INTSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == INTSXP);
+    make_sure(TYPEOF(source) == INTSXP, Rf_error, "type of source must be INTSXP");
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -483,7 +481,7 @@ static R_xlen_t slice_integer_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *bu
 }
 
 static R_xlen_t slice_numeric_get_region(SEXP x, R_xlen_t i, R_xlen_t n, double *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     if (get_debug_mode()) {
         Rprintf("slice_numeric_get_region\n");
@@ -495,14 +493,14 @@ static R_xlen_t slice_numeric_get_region(SEXP x, R_xlen_t i, R_xlen_t n, double 
 
     if (is_materialized(x)) {
         SEXP/*REALSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == REALSXP);
+        make_sure(TYPEOF(data) == REALSXP, Rf_error, "type of data must be REALSXP");
         return REAL_GET_REGION(data, i, n, buf);
     }
 
     SEXP/*INTSXP*/ window = get_window(x);
     SEXP/*REALSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == REALSXP);
+    make_sure(TYPEOF(source) == REALSXP, Rf_error, "type of source must be REALSXP");
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -510,7 +508,7 @@ static R_xlen_t slice_numeric_get_region(SEXP x, R_xlen_t i, R_xlen_t n, double 
 }
 
 static R_xlen_t slice_raw_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rbyte *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     if (get_debug_mode()) {
         Rprintf("slice_raw_get_region\n");
@@ -522,14 +520,14 @@ static R_xlen_t slice_raw_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rbyte *buf)
 
     if (is_materialized(x)) {
         SEXP/*RAWSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == RAWSXP);
+        make_sure(TYPEOF(data) == RAWSXP, Rf_error, "type of data must be RAWSXP");
         return RAW_GET_REGION(data, i, n, buf);
     }
 
     SEXP/*INTSXP*/ window = get_window(x);
     SEXP/*RAWSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == RAWSXP);
+    make_sure(TYPEOF(source) == RAWSXP, Rf_error, "type of source must be RAWSXP");
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -537,7 +535,7 @@ static R_xlen_t slice_raw_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rbyte *buf)
 }
 
 static R_xlen_t slice_complex_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rcomplex *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     if (get_debug_mode()) {
         Rprintf("slice_complex_get_region\n");
@@ -549,14 +547,14 @@ static R_xlen_t slice_complex_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rcomple
 
     if (is_materialized(x)) {
         SEXP/*CPLXSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == CPLXSXP);
+        make_sure(TYPEOF(data) == CPLXSXP, Rf_error, "type of data must be CPLXSXP");
         return COMPLEX_GET_REGION(data, i, n, buf);
     }
 
     SEXP/*INTSXP*/  window = get_window(x);
     SEXP/*CPLXSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == CPLXSXP);
+    make_sure(TYPEOF(source) == CPLXSXP, Rf_error, "type of source must be CPLXSXP");
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -564,7 +562,7 @@ static R_xlen_t slice_complex_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rcomple
 }
 
 static R_xlen_t slice_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     if (get_debug_mode()) {
         Rprintf("slice_logical_get_region\n");
@@ -576,14 +574,14 @@ static R_xlen_t slice_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *bu
 
     if (is_materialized(x)) {
         SEXP/*LGLSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == LGLSXP);
+        make_sure(TYPEOF(data) == LGLSXP, Rf_error, "type of data must be LGLSXP");
         return LOGICAL_GET_REGION(data, i, n, buf);
     }
 
     SEXP/*INTSXP*/ window = get_window(x);
     SEXP/*LGLSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == LGLSXP);
+    make_sure(TYPEOF(source) == LGLSXP, Rf_error, "type of source must be LGLSXP");
 
     R_xlen_t projected_index = project_index(window, i);
 
@@ -591,8 +589,10 @@ static R_xlen_t slice_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *bu
 }
 
 SEXP translate_indices(SEXP original, R_xlen_t offset, R_xlen_t size) {
-	assert(TYPEOF(original) == INTSXP || TYPEOF(original) == REALSXP);
-	assert(sizeof(R_xlen_t) <= sizeof(double));
+	make_sure(TYPEOF(original) == INTSXP || TYPEOF(original) == REALSXP, Rf_error,
+			  "type of original must be either INTSXP or REALSXP");
+	make_sure(sizeof(R_xlen_t) <= sizeof(double), Rf_error,
+			  "a vector of doubles must be able to contain elements of type R_xlen_t");
 
 	SEXP translated = allocVector(REALSXP, XLENGTH(original)); // FIXME translation altrep vector
 
@@ -627,7 +627,7 @@ SEXP translate_indices(SEXP original, R_xlen_t offset, R_xlen_t size) {
 }
 
 static SEXP slice_extract_subset(SEXP x, SEXP indices, SEXP call) {
-    assert(x != NULL);
+    make_sure(x != NULL && x != R_NilValue, Rf_error, "x cannot be null");
 
     if (get_debug_mode()) {
         Rprintf("slice_extract_subset\n");
@@ -750,16 +750,18 @@ void init_slice_altrep_class(DllInfo * dll) {
 }
 
 SEXP create_slice(SEXP source, SEXP/*INTSXP|REALSXP*/ start_sexp, SEXP/*INTSXP|REALSXP*/ size_sexp) {
-    assert(TYPEOF(start_sexp) == INTSXP || TYPEOF(start_sexp) == REALSXP);
-    assert(TYPEOF(size_sexp) == INTSXP || TYPEOF(size_sexp) == REALSXP);
-    assert(XLENGTH(start_sexp) > 0);
-    assert(XLENGTH(size_sexp) > 0);
+    make_sure(TYPEOF(start_sexp) == INTSXP || TYPEOF(start_sexp) == REALSXP, Rf_error,
+    		  "type of start must be either INTSXP or REALSXP");
+    make_sure(TYPEOF(size_sexp) == INTSXP || TYPEOF(size_sexp) == REALSXP, Rf_error,
+    		  "type of size must be either INTSXP or REALSXP");
+    make_sure(XLENGTH(start_sexp) > 0, Rf_error, "start cannot be a zero-length vector");
+    make_sure(XLENGTH(size_sexp) > 0, Rf_error, "size cannot be a zero-length vector");
 
     R_xlen_t start       = get_first_element_as_length(start_sexp) - 1;
     R_xlen_t size        = get_first_element_as_length(size_sexp);
 
-    assert(start < XLENGTH(source));
-    assert(start + size <= XLENGTH(source));
+    make_sure(start < XLENGTH(source), Rf_error, "start cannot be greater than length of source");
+    make_sure(start + size <= XLENGTH(source), Rf_error, "viewport must fit within the length of source");
 
     if (get_debug_mode()) {
         Rprintf("create slice\n");

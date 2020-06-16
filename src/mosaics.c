@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <stdbool.h>
 
 #define USE_RINTERNALS
@@ -14,6 +13,9 @@
 
 #include "common.h"
 #include "mosaics.h"
+
+#define MAKE_SURE
+#include "make_sure.h"
 
 static R_altrep_class_t mosaic_integer_altrep;
 static R_altrep_class_t mosaic_numeric_altrep;
@@ -35,10 +37,10 @@ static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) { // @suppres
 #define how_many_ints_in_R_xlen_t (sizeof(R_xlen_t) / sizeof(int))
 
 R_xlen_t convert_logical_mask_to_bitmap(SEXP/*LGLSXP*/ mask, SEXP/*INTSXP*/ bitmap) {
-    assert(TYPEOF(mask) == LGLSXP);
+    make_sure(TYPEOF(mask) == LGLSXP, Rf_error, "mask must be a vector of type LGLSXP");
 
     R_xlen_t size = XLENGTH(mask);
-    assert(XLENGTH(mask) == XTRUELENGTH(bitmap));
+    make_sure(XLENGTH(mask) == XTRUELENGTH(bitmap), Rf_error, "mask must the same length as the bitmap");
 
     R_xlen_t elements = 0;
     for (R_xlen_t i = 0; i < size; i++) {
@@ -56,7 +58,7 @@ R_xlen_t convert_logical_mask_to_bitmap(SEXP/*LGLSXP*/ mask, SEXP/*INTSXP*/ bitm
 }
 
 R_xlen_t convert_integer_indices_to_bitmap(SEXP/*INTSXP*/ indices, SEXP/*INTSXP*/ bitmap) {
-    assert(TYPEOF(indices) == INTSXP);
+    make_sure(TYPEOF(indices) == INTSXP, Rf_error, "type of indices must be INTSXP");
     R_xlen_t size = XLENGTH(indices);
 
     int previous = NA_INTEGER;
@@ -68,7 +70,7 @@ R_xlen_t convert_integer_indices_to_bitmap(SEXP/*INTSXP*/ indices, SEXP/*INTSXP*
         if (previous != NA_INTEGER && previous >= current) {
             Rf_error("Mosaics can only be created from an ordered index list, but %li >= %li\n", previous, current);
         }
-        assert(current > 0);
+        make_sure(current > 0, Rf_error, "index value must be greater than zero");
         bitmap_set(bitmap, (R_xlen_t) current - 1);
         previous = current;
     }
@@ -77,7 +79,7 @@ R_xlen_t convert_integer_indices_to_bitmap(SEXP/*INTSXP*/ indices, SEXP/*INTSXP*
 }
 
 R_xlen_t convert_numeric_indices_to_bitmap(SEXP/*REALSXP*/ indices, SEXP/*INTSXP*/ bitmap){
-    assert(TYPEOF(indices) == REALSXP);
+	make_sure(TYPEOF(indices) == REALSXP, Rf_error, "type of indices must be REALSXP");
     R_xlen_t size = XLENGTH(indices);
 
     double previous = NA_REAL;
@@ -89,7 +91,7 @@ R_xlen_t convert_numeric_indices_to_bitmap(SEXP/*REALSXP*/ indices, SEXP/*INTSXP
         if (!ISNAN(previous) && previous >= current) {
             Rf_error("Mosaics can only be created from an ordered index list, but %li >= %li\n", previous, current);
         }
-        assert(current > 0);
+        make_sure(current > 0, Rf_error, "index value must be greater than zero");
         bitmap_set(bitmap, (R_xlen_t) current - 1);
         previous = current;
     }
@@ -100,7 +102,8 @@ R_xlen_t convert_numeric_indices_to_bitmap(SEXP/*REALSXP*/ indices, SEXP/*INTSXP
 
 R_xlen_t convert_indices_to_bitmap(SEXP/*INTSXP | REALSXP | LGLSXP*/ indices, SEXP/*INTSXP*/ bitmap) {  // @suppress("No return")
     SEXPTYPE type = TYPEOF(indices);
-    assert(type == INTSXP || type == REALSXP || type == LGLSXP);
+    make_sure(type == INTSXP || type == REALSXP || type == LGLSXP, Rf_error,
+    		  "type of indices must be one of INTSXP, REALSXP, or LGLSXP");
 
     switch (type) {
         case INTSXP:  return convert_integer_indices_to_bitmap(indices, bitmap);
@@ -111,15 +114,13 @@ R_xlen_t convert_indices_to_bitmap(SEXP/*INTSXP | REALSXP | LGLSXP*/ indices, SE
 }
 
 SEXP/*A*/ mosaic_new(SEXP/*A*/ source, SEXP/*INTSXP*/ bitmap, R_xlen_t size) {
-
-    assert(TYPEOF(source) == INTSXP
+    make_sure(TYPEOF(source) == INTSXP
            || TYPEOF(source) == REALSXP
            || TYPEOF(source) == CPLXSXP
            || TYPEOF(source) == LGLSXP
            || TYPEOF(source) == VECSXP
-           || TYPEOF(source) == STRSXP);
-
-    //assert(TYPEOF(indices) == INTSXP);
+           || TYPEOF(source) == STRSXP, Rf_error,
+		      "type of indices must be one of INTSXP, REALSXP, or LGLSXP, CPLXSXP, VECSXP, or STRSXP");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_new\n");
@@ -138,40 +139,6 @@ SEXP/*A*/ mosaic_new(SEXP/*A*/ source, SEXP/*INTSXP*/ bitmap, R_xlen_t size) {
 
     return R_new_altrep(class_from_sexp_type(TYPEOF(source)), bitmap, data);
 }
-
-//SEXP/*A*/ mosaic_new_from_bitmap(SEXP/*A*/ source, SEXP/*INTSXP*/ source_bitmap) {
-//
-//    assert(TYPEOF(source) == INTSXP
-//           || TYPEOF(source) == REALSXP
-//           || TYPEOF(source) == CPLXSXP
-//           || TYPEOF(source) == LGLSXP
-//           || TYPEOF(source) == VECSXP
-//           || TYPEOF(source) == STRSXP);
-//
-//    assert(TYPEOF(source_bitmap) == INTSXP);
-//
-//    if (get_debug_mode()) {
-//        Rprintf("mosaic_new_from_bitmap\n");
-//        Rprintf("             SEXP: %p\n", source);
-//        Rprintf("           bitmap: %p\n", source_bitmap);
-//        Rprintf("      bitmap type: %li\n", TYPEOF(source_bitmap));
-//        Rprintf("    bitmap length: %li\n", XLENGTH(source_bitmap));
-//        Rprintf("bitmap truelength: %li\n", XTRUELENGTH(source_bitmap));
-//    }
-//
-//    SEXP/*INTSXP*/ bitmap = bitmap_clone(source_bitmap);
-//
-//    R_xlen_t how_many_bits = bitmap_count_set_bits(bitmap);
-//    SEXP/*REALSXP*/ length_vector = allocVector(REALSXP, 1);
-//    SET_REAL_ELT(length_vector, 0, how_many_bits);
-//
-//    SEXP/*LISTSXP*/ data = allocSExp(LISTSXP);
-//    SETCAR (data, source);     // The original vector
-//    SET_TAG(data, R_NilValue); // Starts as R_NilValue, becomes a vector if it the mosaic is written to
-//    SETCDR (data, length_vector); // The number of set bits in the mask goes here, aka length
-//
-//    return R_new_altrep(mosaic_altrep, bitmap, data);
-//}
 
 static inline SEXP/*INTSXP*/ get_bitmap(SEXP x) {
     return R_altrep_data1(x);
@@ -261,7 +228,8 @@ SEXP copy_from_source(SEXP x) {
     SEXP           source = get_source(x);
     R_xlen_t       length = get_length(x);
 
-    assert(XTRUELENGTH(bitmap) == XLENGTH(source));
+    make_sure(XTRUELENGTH(bitmap) == XLENGTH(source), Rf_error,
+    		  "bitmap must be the same length as source");
 
     SEXP materialized = allocVector(TYPEOF(source), length);
     R_xlen_t cursor = 0;
@@ -271,12 +239,13 @@ SEXP copy_from_source(SEXP x) {
             cursor++;
         }
     }
-    assert(cursor == length);
+    make_sure(cursor == length, Rf_error,
+    		  "the number of copied elements is different than the length of the output vector");
     return materialized;
 }
 
 static void *mosaic_dataptr(SEXP x, Rboolean writeable) {
-    assert(x != NULL);
+    make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_dataptr\n");
@@ -296,7 +265,7 @@ static void *mosaic_dataptr(SEXP x, Rboolean writeable) {
 }
 
 static const void *mosaic_dataptr_or_null(SEXP x) {
-    assert(x != NULL);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_dataptr_or_null\n");
@@ -313,23 +282,8 @@ static const void *mosaic_dataptr_or_null(SEXP x) {
     return DATAPTR_RO(data);
 }
 
-//R_xlen_t project_index(SEXP/*INTSXP*/ bitmap, R_xlen_t index) {
-//    assert(bitmap != R_NilValue);
-//
-//    R_xlen_t projected_index = bitmap_index_of_nth_set_bit(bitmap, index);
-//
-//    if (get_debug_mode()) {
-//        Rprintf("    projecting index\n");
-//        Rprintf("         bitmap SEXP: %p\n",  bitmap);
-//        Rprintf("         input index: %li\n", index);
-//        Rprintf("     projected index: %li\n", projected_index);
-//    }
-//
-//    return projected_index;
-//}
-
 static int mosaic_integer_element(SEXP x, R_xlen_t i) {  // CONTINUE HERE
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_integer_element\n");
@@ -340,20 +294,20 @@ static int mosaic_integer_element(SEXP x, R_xlen_t i) {  // CONTINUE HERE
 
     if (is_materialized(x)) {
         SEXP/*INTSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == INTSXP);
+        make_sure(TYPEOF(data) == INTSXP, Rf_error, "type of data must be INTSXP");
         return INTEGER_ELT(data, i);
     }
 
     SEXP/*INTSXP*/ bitmap = get_bitmap(x);
     SEXP/*INTSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == INTSXP);
+    make_sure(TYPEOF(source) == INTSXP, Rf_error, "type of source must be INTSXP");
     R_xlen_t projected_index = bitmap_index_of_nth_set_bit(bitmap, i);
     return INTEGER_ELT(source, projected_index);
 }
 
 static double mosaic_numeric_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_numeric_element\n");
@@ -364,20 +318,20 @@ static double mosaic_numeric_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*REALSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == REALSXP);
+        make_sure(TYPEOF(data) == REALSXP, Rf_error, "type of data must be REALSXP");
         return REAL_ELT(data, i);
     }
 
     SEXP/*INTSXP*/  bitmap = get_bitmap(x);
     SEXP/*REALSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == REALSXP);
+    make_sure(TYPEOF(source) == REALSXP, Rf_error, "type of source must be REALSXP");
     R_xlen_t projected_index = bitmap_index_of_nth_set_bit(bitmap, i);
     return REAL_ELT(source, projected_index);
 }
 
 static Rbyte mosaic_raw_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_raw_element\n");
@@ -388,20 +342,20 @@ static Rbyte mosaic_raw_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*RAWSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == RAWSXP);
+        make_sure(TYPEOF(data) == RAWSXP, Rf_error, "type of data must be RAWSXP");
         return RAW_ELT(data, i);
     }
 
     SEXP/*INTSXP*/ bitmap = get_bitmap(x);
     SEXP/*RAWSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == RAWSXP);
+    make_sure(TYPEOF(source) == RAWSXP, Rf_error, "type of source must be RAWSXP");
     R_xlen_t projected_index = bitmap_index_of_nth_set_bit(bitmap, i);
     return RAW_ELT(source, projected_index);
 }
 
 static Rcomplex mosaic_complex_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_complex_element\n");
@@ -412,21 +366,20 @@ static Rcomplex mosaic_complex_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*CPLXSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == CPLXSXP);
+        make_sure(TYPEOF(data) == CPLXSXP, Rf_error, "type of data must be CPLXSXP");
         return COMPLEX_ELT(data, i);
     }
 
     SEXP/*INTSXP*/  bitmap = get_bitmap(x);
     SEXP/*CPLXSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == CPLXSXP);
-    //R_xlen_t projected_index = project_index(bitmap, i);
+    make_sure(TYPEOF(source) == CPLXSXP, Rf_error, "type of source must be CPLXSXP");
     R_xlen_t projected_index = bitmap_index_of_nth_set_bit(bitmap, i);
     return COMPLEX_ELT(source, projected_index);
 }
 
 static int mosaic_logical_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_logical_element\n");
@@ -437,20 +390,20 @@ static int mosaic_logical_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*LGLSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == LGLSXP);
+        make_sure(TYPEOF(data) == LGLSXP, Rf_error, "type of data must be LGLSXP");
         return LOGICAL_ELT(data, i);
     }
 
     SEXP/*INTSXP*/ bitmap = get_bitmap(x);
     SEXP/*LGLSXP*/ source = get_source(x);
 
-    assert(TYPEOF(source) == LGLSXP);
+    make_sure(TYPEOF(source) == LGLSXP, Rf_error, "type of source must be LGLSXP");
     R_xlen_t projected_index = bitmap_index_of_nth_set_bit(bitmap, i);
     return LOGICAL_ELT(source, projected_index);
 }
 
 static R_xlen_t mosaic_integer_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_integer_get_region\n");
@@ -467,12 +420,13 @@ static R_xlen_t mosaic_integer_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *b
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == INTSXP);
+
+    make_sure(TYPEOF(data) == INTSXP, Rf_error, "type of data must be INTSXP");
     return INTEGER_GET_REGION(data, i, n, buf);
 }
 
 static R_xlen_t mosaic_numeric_get_region(SEXP x, R_xlen_t i, R_xlen_t n, double *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_numeric_get_region\n");
@@ -489,12 +443,13 @@ static R_xlen_t mosaic_numeric_get_region(SEXP x, R_xlen_t i, R_xlen_t n, double
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == REALSXP);
+
+    make_sure(TYPEOF(data) == REALSXP, Rf_error, "type of data must be REALSXP");
     return REAL_GET_REGION(data, i, n, buf);
 }
 
 static R_xlen_t mosaic_raw_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rbyte *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_raw_get_region\n");
@@ -511,12 +466,13 @@ static R_xlen_t mosaic_raw_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rbyte *buf
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == RAWSXP);
+
+    make_sure(TYPEOF(data) == RAWSXP, Rf_error, "type of data must be RAWSXP");
     return RAW_GET_REGION(data, i, n, buf);
 }
 
 static R_xlen_t mosaic_complex_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rcomplex *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_complex_get_region\n");
@@ -533,12 +489,13 @@ static R_xlen_t mosaic_complex_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rcompl
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == CPLXSXP);
+
+    make_sure(TYPEOF(data) == CPLXSXP, Rf_error, "type of data must be CPLXSXP");
     return COMPLEX_GET_REGION(data, i, n, buf);
 }
 
 static R_xlen_t mosaic_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *buf) {
-    assert(x != R_NilValue);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_logical_get_region\n");
@@ -555,7 +512,8 @@ static R_xlen_t mosaic_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *b
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == LGLSXP);
+
+    make_sure(TYPEOF(data) == LGLSXP, Rf_error, "type of data must be LGLSXP");
     return LOGICAL_GET_REGION(data, i, n, buf);
 }
 
@@ -593,8 +551,8 @@ SEXP/*REALSXP*/ screen_indices(SEXP/*INTSXP|REALSXP*/ original, R_xlen_t size) {
 }
 
 SEXP/*REALSXP*/ translate_indices_by_bitmap(SEXP/*REALSXP*/ screened_indices, SEXP/*bitmap*/ bitmap) {
-	assert(TYPEOF(screened_indices) == REALSXP);
-	assert(TYPEOF(bitmap) == INTSXP);
+    make_sure(TYPEOF(screened_indices) == REALSXP, Rf_error, "type of screened_indices must be REALSXP");
+    make_sure(TYPEOF(bitmap) == INTSXP, Rf_error, "type of bitmap must be INTSXP");
 
 	SEXP/*REALSXP*/ translated_indices = allocVector(REALSXP, XLENGTH(screened_indices));
 
@@ -636,8 +594,9 @@ SEXP/*bitmap*/ translate_bitmap(SEXP source, SEXP/*bitmap*/ bitmap, SEXP/*REALSX
 }
 
 static SEXP mosaic_extract_subset(SEXP x, SEXP indices, SEXP call) {
-    assert(x != NULL);
-    assert(TYPEOF(indices) == INTSXP || TYPEOF(indices) == REALSXP);
+    make_sure(x != NULL, Rf_error, "x cannot be null");
+    make_sure(TYPEOF(indices) == INTSXP || TYPEOF(indices) == REALSXP, Rf_error,
+    		  "type of indices must be either INTSXP or REALSXP");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_extract_subset\n");
@@ -753,16 +712,20 @@ void init_mosaic_altrep_class(DllInfo * dll) {
 
 SEXP/*A*/ create_mosaic(SEXP/*A*/ source, SEXP/*INTSXP|REALSXP|LGLSXP*/ indices) {
 
-    assert(TYPEOF(source) == INTSXP
+    make_sure(TYPEOF(source) == INTSXP
            || TYPEOF(source) == REALSXP
            || TYPEOF(source) == CPLXSXP
            || TYPEOF(source) == LGLSXP
            || TYPEOF(source) == VECSXP
-           || TYPEOF(source) == STRSXP);
+           || TYPEOF(source) == STRSXP, Rf_error,
+		      "type of source must be one of INTSXP, REALSXP, CPLXSXP, LGLSXP, VECSXP, or STRSXP");
 
-    assert(TYPEOF(indices) == INTSXP
+
+    make_sure(TYPEOF(indices) == INTSXP
            || TYPEOF(indices) == REALSXP
-           || (TYPEOF(indices) == LGLSXP && (XTRUELENGTH(indices) == XLENGTH(indices))));
+           || (TYPEOF(indices) == LGLSXP && (XTRUELENGTH(indices) == XLENGTH(source))), Rf_error,
+        	  "type of indices must be either INTSXP or REALSXP or LGLSXP "
+        	  "(if it is LGLSXP, the length of indices must be the same as the source)");
 
     if (get_debug_mode()) {
         Rprintf("mosaic_new\n");
@@ -772,17 +735,7 @@ SEXP/*A*/ create_mosaic(SEXP/*A*/ source, SEXP/*INTSXP|REALSXP|LGLSXP*/ indices)
         Rprintf(" indices length: %li\n", XLENGTH(indices));
     }
 
-    //R_xlen_t how_many_indices = XLENGTH(indices);
     SEXP/*INTSXP*/ bitmap = bitmap_new(XLENGTH(source));
     R_xlen_t how_many_set_bits = convert_indices_to_bitmap(indices, bitmap);
-
-    //SEXP/*REALSXP*/ length_vector = allocVector(REALSXP, 1);
-    //SET_REAL_ELT(length_vector, 0, how_many_set_bits);
-
-    //SEXP/*LISTSXP*/ data = allocSExp(LISTSXP);
-    //SETCAR (data, source);        // The original vector
-    //SET_TAG(data, R_NilValue);    // Starts as R_NilValue, becomes a vector if it the mosaic is written to
-    //SETCDR (data, length_vector); // The number of set bits in the mask goes here, aka length
-
     return mosaic_new(source, bitmap, how_many_set_bits);
 }

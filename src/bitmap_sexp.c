@@ -2,12 +2,14 @@
 #include <R.h>
 #include <Rinternals.h>
 
-#include <assert.h>
 #include <limits.h>
 
 #include "bitmap_sexp.h"
 
 #define hot_many_bits_in_int (sizeof(int) * CHAR_BIT)
+
+#define MAKE_SURE
+#include "make_sure.h"
 
 SEXP/*INTSXP*/ bitmap_new(R_xlen_t size_in_bits) {
     R_xlen_t size_in_ints = size_in_bits / hot_many_bits_in_int + 1;
@@ -21,7 +23,8 @@ SEXP/*INTSXP*/ bitmap_new(R_xlen_t size_in_bits) {
 }
 
 void bitmap_set(SEXP/*INTSXP*/ bitmap, R_xlen_t which_bit) {
-    assert(TYPEOF(bitmap) == INTSXP);
+    make_sure(TYPEOF(bitmap) == INTSXP, Rf_error, "bitmap must be a vector of type INTSXP");
+
     int *words = (int *) INTEGER(bitmap);
     R_xlen_t which_word = ((which_bit) / hot_many_bits_in_int);
     int mask = (1 << ((which_bit) % hot_many_bits_in_int));
@@ -29,7 +32,8 @@ void bitmap_set(SEXP/*INTSXP*/ bitmap, R_xlen_t which_bit) {
 }
 
 void bitmap_reset(SEXP bitmap, R_xlen_t which_bit) {
-    assert(TYPEOF(bitmap) == INTSXP);
+	make_sure(TYPEOF(bitmap) == INTSXP, Rf_error, "bitmap must be a vector of type INTSXP");
+
     int *words = (int *) INTEGER(bitmap);
     R_xlen_t which_word = ((which_bit) / hot_many_bits_in_int);
     int mask = (1 << ((which_bit) % hot_many_bits_in_int));
@@ -37,7 +41,8 @@ void bitmap_reset(SEXP bitmap, R_xlen_t which_bit) {
 }
 
 bool bitmap_get(SEXP bitmap, R_xlen_t which_bit) {
-    assert(TYPEOF(bitmap) == INTSXP);
+	make_sure(TYPEOF(bitmap) == INTSXP, Rf_error, "bitmap must be a vector of type INTSXP");
+
     int *words = (int *) INTEGER(bitmap);
     R_xlen_t which_word = ((which_bit) / hot_many_bits_in_int);
     int mask = (1 << ((which_bit) % hot_many_bits_in_int));
@@ -55,7 +60,7 @@ R_xlen_t bitmap_count_set_bits(SEXP bitmap) {
 }
 
 SEXP/*INTSXP*/ bitmap_clone(SEXP/*INTSXP*/ source) {
-    assert(TYPEOF(source) == INTSXP);
+	make_sure(TYPEOF(source) == INTSXP, Rf_error, "source must be a vector of type INTSXP");
 
     R_xlen_t how_many_ints = XLENGTH(source);
     R_xlen_t how_many_bits = XTRUELENGTH(source);
@@ -68,10 +73,10 @@ SEXP/*INTSXP*/ bitmap_clone(SEXP/*INTSXP*/ source) {
 }
 
 R_xlen_t bitmap_index_of_nth_set_bit (SEXP/*INTSXP*/ bitmap, R_xlen_t which_bit) {
-    assert(TYPEOF(bitmap) == INTSXP);
+	make_sure(TYPEOF(bitmap) == INTSXP, Rf_error, "bitmap must be a vector of type INTSXP");
 
     R_xlen_t how_many_bits = XTRUELENGTH(bitmap);
-    assert(which_bit < how_many_bits);
+    make_sure(which_bit < how_many_bits, Rf_error, "requested bit is out of range of the bitmap");
 
     bool encountered_any_ones_yet = false;
     R_xlen_t ones_encountered_so_far = 0;
@@ -89,6 +94,5 @@ R_xlen_t bitmap_index_of_nth_set_bit (SEXP/*INTSXP*/ bitmap, R_xlen_t which_bit)
     }
 
     Rf_error("Bitmap index out of range.");
-    assert(false);
     return 0;
 }

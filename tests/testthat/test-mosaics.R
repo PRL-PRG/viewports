@@ -55,10 +55,10 @@ test_that("write to mosaic", {
     expect_equal(viewport[1], 42)
 })
 
-# test_that("check range", { FIXME SEGFAULTs
-#     source <- 1:100
-#     expect_error(mosaic(source, 200:400))
-# })
+test_that("check range", {
+    source <- 1:100
+    expect_error(mosaic(source, 200:400))
+})
 
 test_that("dereference out of range", {
     source <- 1:100

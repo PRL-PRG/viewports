@@ -1,13 +1,14 @@
-#include <assert.h>
-
 #define USE_RINTERNALS
 #include <R.h>
 #include <Rinternals.h>
 
 #include "common.h"
 
+#define MAKE_SURE
+#include "make_sure.h"
+
 bool are_integer_indices_monotonic(SEXP/*INTSXP*/ indices) {
-    assert(TYPEOF(indices) == INTSXP);
+    make_sure(TYPEOF(indices) == INTSXP, Rf_error, "type of indices must be INTSXP");
 
     R_xlen_t size = XLENGTH(indices);
     int previous = NA_INTEGER;
@@ -26,7 +27,7 @@ bool are_integer_indices_monotonic(SEXP/*INTSXP*/ indices) {
 }
 
 bool are_numeric_indices_monotonic(SEXP/*REALSXP*/ indices) {
-    assert(TYPEOF(indices) == REALSXP);
+	make_sure(TYPEOF(indices) == REALSXP, Rf_error, "type of indices should be REALSXP");
 
     R_xlen_t size = XLENGTH(indices);
     double previous = NA_REAL;
@@ -46,7 +47,7 @@ bool are_numeric_indices_monotonic(SEXP/*REALSXP*/ indices) {
 
 bool are_indices_monotonic (SEXP/*INTSXP | REALSXP*/ indices) {
     SEXPTYPE type = TYPEOF(indices);
-    assert(type == INTSXP || type == REALSXP);
+    make_sure(type == INTSXP || type == REALSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
 
     switch (type) {
         case INTSXP:  return are_integer_indices_monotonic(indices);
@@ -56,7 +57,7 @@ bool are_indices_monotonic (SEXP/*INTSXP | REALSXP*/ indices) {
 }
 
 bool are_integer_indices_contiguous(SEXP/*INTSXP*/ indices) {
-    assert(TYPEOF(indices) == INTSXP);
+	make_sure(TYPEOF(indices) == INTSXP, Rf_error, "type of indices should be INTSXP");
 
     R_xlen_t size = XLENGTH(indices);
     int previous = NA_INTEGER;
@@ -76,7 +77,7 @@ bool are_integer_indices_contiguous(SEXP/*INTSXP*/ indices) {
 }
 
 bool are_numeric_indices_contiguous(SEXP/*REALSXP*/ indices) {
-    assert(TYPEOF(indices) == REALSXP);
+	make_sure(TYPEOF(indices) == REALSXP, Rf_error, "type of indices should be REALSXP");
 
     R_xlen_t size = XLENGTH(indices);
     double previous = NA_REAL;
@@ -97,7 +98,7 @@ bool are_numeric_indices_contiguous(SEXP/*REALSXP*/ indices) {
 
 bool are_indices_contiguous(SEXP/*INTSXP | REALSXP*/ indices) {
     SEXPTYPE type = TYPEOF(indices);
-    assert(type == INTSXP || type == REALSXP);
+    make_sure(type == INTSXP || type == REALSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
 
     switch (type) {
         case INTSXP:  return are_integer_indices_contiguous(indices);
@@ -107,8 +108,8 @@ bool are_indices_contiguous(SEXP/*INTSXP | REALSXP*/ indices) {
 }
 
 bool are_integer_indices_in_range(SEXP/*INTSXP*/ indices, R_xlen_t min, R_xlen_t max) {
-    assert(TYPEOF(indices) == INTSXP);
-    assert(min <= max);
+    make_sure(TYPEOF(indices) == INTSXP, Rf_error, "type of indices should be INTSXP");
+    make_sure(min <= max, Rf_error, "min should be less or equal to max");
 
     R_xlen_t size = XLENGTH(indices);
     for (int i = 0; i < size; i++) {
@@ -122,8 +123,8 @@ bool are_integer_indices_in_range(SEXP/*INTSXP*/ indices, R_xlen_t min, R_xlen_t
 }
 
 bool are_numeric_indices_in_range(SEXP/*REALSXP*/ indices, R_xlen_t min, R_xlen_t max) {
-    assert(TYPEOF(indices) == REALSXP);
-    assert(min <= max);
+	make_sure(TYPEOF(indices) == REALSXP, Rf_error, "type of indices should be REALSXP");
+    make_sure(min <= max, Rf_error, "min must be less or equal to max");
 
     R_xlen_t size = XLENGTH(indices);
     for (int i = 0; i < size; i++) {
@@ -138,8 +139,8 @@ bool are_numeric_indices_in_range(SEXP/*REALSXP*/ indices, R_xlen_t min, R_xlen_
 
 bool are_indices_in_range(SEXP/*INTSXP | REALSXP*/ indices, R_xlen_t min, R_xlen_t max) {
     SEXPTYPE type = TYPEOF(indices);
-    assert(type == INTSXP || type == REALSXP);
-    assert(min <= max);
+    make_sure(type == INTSXP || type == REALSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
+    make_sure(min <= max, Rf_error, "min must be less or equal to max");
 
     switch (type) {
         case INTSXP:  return are_integer_indices_in_range(indices, min, max);
@@ -149,7 +150,7 @@ bool are_indices_in_range(SEXP/*INTSXP | REALSXP*/ indices, R_xlen_t min, R_xlen
 }
 
 bool do_integer_indices_contain_NAs(SEXP/*INTSXP*/ indices) {
-    assert(TYPEOF(indices) == INTSXP);
+	make_sure(TYPEOF(indices) == INTSXP, Rf_error, "type of indices should be INTSXP");
     R_xlen_t size = XLENGTH(indices);
     for (int i = 0; i < size; i++) {
         if (INTEGER_ELT(indices, i) == NA_INTEGER) {
@@ -160,7 +161,7 @@ bool do_integer_indices_contain_NAs(SEXP/*INTSXP*/ indices) {
 }
 
 bool do_numeric_indices_contain_NAs(SEXP/*REALSXP*/ indices) {
-    assert(TYPEOF(indices) == REALSXP);
+	make_sure(TYPEOF(indices) == REALSXP, Rf_error, "type of indices should be REALSXP");
     R_xlen_t size = XLENGTH(indices);
     for (int i = 0; i < size; i++) {
         if (ISNAN(REAL_ELT(indices, i))) {
@@ -172,7 +173,7 @@ bool do_numeric_indices_contain_NAs(SEXP/*REALSXP*/ indices) {
 
 bool do_indices_contain_NAs(SEXP/*INTSXP | REALSXP*/ indices) {
     SEXPTYPE type = TYPEOF(indices);
-    assert(type == INTSXP || type == REALSXP);
+    make_sure(type == INTSXP || type == REALSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
 
     switch (type) {
         case INTSXP:  return do_integer_indices_contain_NAs(indices);
@@ -183,8 +184,8 @@ bool do_indices_contain_NAs(SEXP/*INTSXP | REALSXP*/ indices) {
 
 R_xlen_t get_first_element_as_length(SEXP/*INTSXP | REALSXP*/ indices) {
     SEXPTYPE type = TYPEOF(indices);
-    assert(type == INTSXP || type == REALSXP);
-    assert(XLENGTH(indices) > 0);
+    make_sure(type == INTSXP || type == REALSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
+    make_sure(XLENGTH(indices) > 0, Rf_error, "indices cannot be empty");
 
     switch (type) {
         case INTSXP:  return (R_xlen_t) INTEGER_ELT(indices, 0);
@@ -194,14 +195,11 @@ R_xlen_t get_first_element_as_length(SEXP/*INTSXP | REALSXP*/ indices) {
 }
 
 void copy_element(SEXP source, R_xlen_t source_index, SEXP target, R_xlen_t target_index) {
-    assert(TYPEOF(source) == TYPEOF(target));
-    assert(TYPEOF(source) == INTSXP
-           || TYPEOF(source) == REALSXP
-           || TYPEOF(source) == CPLXSXP
-           || TYPEOF(source) == LGLSXP
-           || TYPEOF(target) == RAWSXP
-           || TYPEOF(source) == VECSXP
-           || TYPEOF(source) == STRSXP);
+    make_sure(TYPEOF(source) == TYPEOF(target), Rf_error, "type of source and target must be the same");
+    make_sure(TYPEOF(source) == INTSXP  || TYPEOF(source) == REALSXP || TYPEOF(source) == CPLXSXP
+            || TYPEOF(source) == LGLSXP || TYPEOF(target) == RAWSXP  || TYPEOF(source) == VECSXP
+            || TYPEOF(source) == STRSXP,
+			Rf_error, "type of source must be one of INTSXP, REALSXP, CPLXSXP, LGLSXP, RAWSXP, VECSXP, or STRSXP");
 
     switch(TYPEOF(source)) {
         case INTSXP:  SET_INTEGER_ELT (target, target_index, INTEGER_ELT (source, source_index)); break;
@@ -216,11 +214,10 @@ void copy_element(SEXP source, R_xlen_t source_index, SEXP target, R_xlen_t targ
 }
 
 void set_element_to_NA(SEXP target, R_xlen_t target_index) {
-    assert(TYPEOF(target) == INTSXP
-           || TYPEOF(target) == REALSXP
-           || TYPEOF(target) == CPLXSXP
-           || TYPEOF(target) == LGLSXP
-           || TYPEOF(source) == STRSXP);
+
+	make_sure(TYPEOF(target) == INTSXP  || TYPEOF(target) == REALSXP || TYPEOF(target) == CPLXSXP
+	       || TYPEOF(target) == LGLSXP  || TYPEOF(target) == STRSXP,
+		   Rf_error, "type of source must be one of INTSXP, REALSXP, CPLXSXP, LGLSXP, or STRSXP");
 
     switch(TYPEOF(target)) {
         case INTSXP:  SET_INTEGER_ELT (target, target_index, NA_INTEGER); break;
@@ -250,7 +247,7 @@ SEXP copy_data_in_range(SEXP source, R_xlen_t start, R_xlen_t size) {
 SEXP copy_data_at_indices(SEXP source, SEXP/*INTSXP | REALSXP*/ indices) {
 
     SEXPTYPE type = TYPEOF(indices);
-    assert(type == INTSXP || type == REALSXP);
+    make_sure(type == INTSXP || type == REALSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
 
     R_xlen_t size = XLENGTH(indices);
     SEXP target = allocVector(TYPEOF(source), size);
@@ -290,7 +287,7 @@ SEXP copy_data_at_indices(SEXP source, SEXP/*INTSXP | REALSXP*/ indices) {
 SEXP copy_data_at_mask(SEXP source, SEXP/*LGLSXP*/ mask) {
 
     SEXPTYPE type = TYPEOF(mask);
-    assert(type == LGLSXP);
+    make_sure(type == LGLSXP, Rf_error, "type of mask must be LGLSXP");
 
     R_xlen_t mask_size = XLENGTH(mask);
     R_xlen_t target_size = mask_size;
@@ -318,11 +315,12 @@ SEXP copy_data_at_mask(SEXP source, SEXP/*LGLSXP*/ mask) {
         }
     }
 
-    assert(XLENGTH(target) == copied_elements);
+    make_sure(XLENGTH(target) == copied_elements, Rf_error,
+    		  "the number of copied elements is different than the size of the output vector");
     return target;
 }
 
 viewport_type_t recommend_vieport_type_for_indices(SEXP/*INTSXP | REALSXP*/ indices) {
-    assert(false); //FIXME
+    make_sure(false, Rf_error, "not implemented"); //FIXME
     return VIEWPORT_NONE;
 }

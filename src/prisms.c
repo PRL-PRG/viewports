@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <stdbool.h>
 
 #define USE_RINTERNALS
@@ -13,6 +12,9 @@
 
 #include "slices.h"
 #include "common.h"
+
+#define MAKE_SURE
+#include "make_sure.h"
 
 static R_altrep_class_t prism_integer_altrep;
 static R_altrep_class_t prism_numeric_altrep;
@@ -32,9 +34,9 @@ static inline R_altrep_class_t class_from_sexp_type(SEXPTYPE type) { // @suppres
 }
 
 SEXP prism_new(SEXP source, SEXP/*INTSXP|REALSXP*/ indices) {
-    assert(sizeof(double) >= sizeof(R_xlen_t));
-    assert(TYPEOF(indices) == REALSXP || TYPEOF(indices) == INTSXP);
-    assert(source != NULL);
+    make_sure(sizeof(double) >= sizeof(R_xlen_t), Rf_error, "a vector of doubles cannot serve as a vector of R_xlen_t");
+    make_sure(TYPEOF(indices) == REALSXP || TYPEOF(indices) == INTSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
+    make_sure(source != NULL && source != R_NilValue, Rf_error, "source must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_new\n");
@@ -129,40 +131,8 @@ static R_xlen_t prism_length(SEXP x) {
     return XLENGTH(get_indices(x));
 }
 
-//SEXP copy_from_source(SEXP x) {
-//    SEXP/*INTSXP|REALSXP*/  indices = get_indices(x);
-//    SEXP                    source  = get_source(x);
-//    R_xlen_t                length  = XLENGTH(indices);
-//
-//    SEXP materialized = allocVector(TYPEOF(source), length);
-//    R_xlen_t cursor = 0;
-//    switch (TYPEOF(indices)) {
-//        case INTSXP:
-//            for (R_xlen_t i = 0; i < length; i++) {
-//                R_xlen_t source_index = INTEGER_ELT(indices, i - 1);
-//                copy_element(source, source_index, materialized, i);
-//                cursor++;
-//            }
-//            break;
-//
-//        case REALSXP:
-//            for (R_xlen_t i = 0; i < length; i++) {
-//                R_xlen_t source_index = REAL_ELT(indices, i - 1);
-//                copy_element(source, source_index, materialized, i);
-//                cursor++;
-//            }
-//            break;
-//
-//        default:
-//            Rf_error("Prisms can be indexed by integer or numeric vectors but found: %d\n", TYPEOF(indices));
-//    }
-//
-//    assert(cursor == length);
-//    return materialized;
-//}
-
 static void *prism_dataptr(SEXP x, Rboolean writeable) {
-    assert(x != NULL);
+    make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_dataptr\n");
@@ -184,7 +154,7 @@ static void *prism_dataptr(SEXP x, Rboolean writeable) {
 }
 
 static const void *prism_dataptr_or_null(SEXP x) {
-    assert(x != NULL);
+	make_sure(x != NULL, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_dataptr_or_null\n");
@@ -205,7 +175,7 @@ static const void *prism_dataptr_or_null(SEXP x) {
 
 static inline R_xlen_t translate_index(SEXP/*INTSXP|REALSXP*/ indices, R_xlen_t index) {
     SEXPTYPE type = TYPEOF(indices);
-    assert(type == INTSXP || type == REALSXP);
+    make_sure(type == REALSXP || type == INTSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
 
     if (type == REALSXP) {
         return (R_xlen_t) REAL_ELT   (indices, index - 1);
@@ -215,7 +185,7 @@ static inline R_xlen_t translate_index(SEXP/*INTSXP|REALSXP*/ indices, R_xlen_t 
 }
 
 static int prism_integer_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_integer_element\n");
@@ -226,7 +196,7 @@ static int prism_integer_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*INTSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == INTSXP);
+        make_sure(TYPEOF(data) == INTSXP, Rf_error, "type of data should be INTSXP");
         return INTEGER_ELT(data, i);
     }
 
@@ -239,12 +209,12 @@ static int prism_integer_element(SEXP x, R_xlen_t i) {
         Rprintf("projected_index: %li\n", projected_index);
     }
 
-    assert(TYPEOF(source) == INTSXP);
+    make_sure(TYPEOF(source) == INTSXP, Rf_error, "type of source should be INTSXP");
     return INTEGER_ELT(source, projected_index);
 }
 
 static double prism_numeric_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_numeric_element\n");
@@ -255,7 +225,7 @@ static double prism_numeric_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*INTSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == INTSXP);
+        make_sure(TYPEOF(data) == REALSXP, Rf_error, "type of data should be REALSXP");
         return INTEGER_ELT(data, i);
     }
 
@@ -268,12 +238,12 @@ static double prism_numeric_element(SEXP x, R_xlen_t i) {
         Rprintf("projected_index: %li\n", projected_index);
     }
 
-    assert(TYPEOF(source) == REALSXP);
+    make_sure(TYPEOF(source) == REALSXP, Rf_error, "type of source should be REALSXP");
     return REAL_ELT(source, projected_index);
 }
 
 static Rbyte prism_raw_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_raw_element\n");
@@ -284,7 +254,7 @@ static Rbyte prism_raw_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*RAWSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == RAWSXP);
+        make_sure(TYPEOF(data) == RAWSXP, Rf_error, "type of data should be RAWSXP");
         return RAW_ELT(data, i);
     }
 
@@ -297,12 +267,12 @@ static Rbyte prism_raw_element(SEXP x, R_xlen_t i) {
         Rprintf("projected_index: %li\n", projected_index);
     }
 
-    assert(TYPEOF(source) == RAWSXP);
+    make_sure(TYPEOF(source) == RAWSXP, Rf_error, "type of source should be RAWSXP");
     return RAW_ELT(source, projected_index);
 }
 
 static Rcomplex prism_complex_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_complex_element\n");
@@ -313,7 +283,7 @@ static Rcomplex prism_complex_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*CPLXSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == CPLXSXP);
+        make_sure(TYPEOF(data) == CPLXSXP, Rf_error, "type of data should be CPLXSXP");
         return COMPLEX_ELT(data, i);
     }
 
@@ -326,12 +296,12 @@ static Rcomplex prism_complex_element(SEXP x, R_xlen_t i) {
         Rprintf("projected_index: %li\n", projected_index);
     }
 
-    assert(TYPEOF(source) == CPLXSXP);
+    make_sure(TYPEOF(source) == CPLXSXP, Rf_error, "type of source should be CPLXSXP");
     return COMPLEX_ELT(source, projected_index);
 }
 
 static int prism_logical_element(SEXP x, R_xlen_t i) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_logical_element\n");
@@ -342,7 +312,7 @@ static int prism_logical_element(SEXP x, R_xlen_t i) {
 
     if (is_materialized(x)) {
         SEXP/*LGLSXP*/ data = get_materialized_data(x);
-        assert(TYPEOF(data) == LGLSXP);
+        make_sure(TYPEOF(data) == LGLSXP, Rf_error, "type of data should be LGLSXP");
         return LOGICAL_ELT(data, i);
     }
 
@@ -355,12 +325,12 @@ static int prism_logical_element(SEXP x, R_xlen_t i) {
         Rprintf("projected_index: %li\n", projected_index);
     }
 
-    assert(TYPEOF(source) == LGLSXP);
+    make_sure(TYPEOF(source) == LGLSXP, Rf_error, "type of source should be LGLSXP");
     return LOGICAL_ELT(source, projected_index);
 }
 
 static R_xlen_t prism_integer_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *buf) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_integer_get_region\n");
@@ -379,12 +349,13 @@ static R_xlen_t prism_integer_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *bu
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == INTSXP);
+
+    make_sure(TYPEOF(data) == INTSXP, Rf_error, "type of data should be INTSXP");
     return INTEGER_GET_REGION(data, i, n, buf);
 }
 
 static R_xlen_t prism_numeric_get_region(SEXP x, R_xlen_t i, R_xlen_t n, double *buf) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_numeric_get_region\n");
@@ -403,12 +374,13 @@ static R_xlen_t prism_numeric_get_region(SEXP x, R_xlen_t i, R_xlen_t n, double 
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == REALSXP);
+
+    make_sure(TYPEOF(data) == REALSXP, Rf_error, "type of data should be REALSXP");
     return REAL_GET_REGION(data, i, n, buf);
 }
 
 static R_xlen_t prism_raw_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rbyte *buf) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_raw_get_region\n");
@@ -427,12 +399,13 @@ static R_xlen_t prism_raw_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rbyte *buf)
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == RAWSXP);
+
+    make_sure(TYPEOF(data) == RAWSXP, Rf_error, "type of data should be RAWSXP");
     return RAW_GET_REGION(data, i, n, buf);
 }
 
 static R_xlen_t prism_complex_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rcomplex *buf) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_complex_get_region\n");
@@ -451,12 +424,13 @@ static R_xlen_t prism_complex_get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rcomple
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == CPLXSXP);
+
+    make_sure(TYPEOF(data) == CPLXSXP, Rf_error, "type of data should be CPLXSXP");
     return COMPLEX_GET_REGION(data, i, n, buf);
 }
 
 static R_xlen_t prism_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *buf) {
-    assert(x != R_NilValue);
+    make_sure(x != R_NilValue, Rf_error, "x must not be null");
 
     if (get_debug_mode()) {
         Rprintf("prism_logical_get_region\n");
@@ -475,13 +449,14 @@ static R_xlen_t prism_logical_get_region(SEXP x, R_xlen_t i, R_xlen_t n, int *bu
     } else {
         data = get_materialized_data(x);
     }
-    assert(TYPEOF(data) == LGLSXP);
+
+    make_sure(TYPEOF(data) == LGLSXP, Rf_error, "type of data should be LGLSXP");
     return LOGICAL_GET_REGION(data, i, n, buf);
 }
 
 static SEXP prism_extract_subset(SEXP x, SEXP indices, SEXP call) {
-    assert(x != NULL);
-    assert(TYPEOF(indices) == INTSXP || TYPEOF(indices) == REALSXP);
+	make_sure(x != NULL, Rf_error, "x must not be null");
+    make_sure(TYPEOF(indices) == REALSXP || TYPEOF(indices) == INTSXP, Rf_error, "type of indices should be either INTSXP or REALSXP");
 
     if (get_debug_mode()) {
         Rprintf("prism_extract_subset\n");
@@ -600,7 +575,6 @@ void init_raw_prism(DllInfo * dll) {
     R_set_altraw_Get_region_method    (cls, prism_raw_get_region);
 }
 
-// UFO Inits
 void init_prism_altrep_class(DllInfo * dll) {
     init_integer_prism(dll);
     init_numeric_prism(dll);
@@ -609,11 +583,9 @@ void init_prism_altrep_class(DllInfo * dll) {
     init_raw_prism(dll);
 }
 
-//SEXP/*NILSXP*/ prism(SEXP, SEXP/*INTSXP|REALSXP*/ start, SEXP/*INTSXP|REALSXP*/ size);
-
-
 SEXP create_prism(SEXP source, SEXP/*INTSXP|REALSXP*/ indices) {
-    assert(TYPEOF(indices) == INTSXP || TYPEOF(indices) == REALSXP);
+	make_sure(TYPEOF(indices) == REALSXP || TYPEOF(indices) == INTSXP, Rf_error,
+			  "type of indices should be either INTSXP or REALSXP");
 
     if (get_debug_mode()) {
         Rprintf("create prism\n");
