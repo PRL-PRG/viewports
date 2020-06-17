@@ -540,17 +540,22 @@ SEXP/*REALSXP*/ translate_indices_by_bitmap(SEXP/*REALSXP*/ screened_indices, SE
 	return translated_indices;
 }
 
-SEXP/*bitmap*/ translate_bitmap(SEXP source, SEXP/*bitmap*/ bitmap, SEXP/*REALSXP|INTSXP*/ indices) {
-    R_xlen_t translated_bitmap_size = get_length(indices);
+SEXP/*bitmap*/ translate_bitmap(SEXP source, SEXP/*bitmap*/ bitmap, SEXP/*INTSXP|REALSXP*/ indices) {
+	make_sure(TYPEOF(indices) == INTSXP ||TYPEOF(indices) == REALSXP, Rf_error,
+			  "type of indices must be either INTSXP or REALSXP");
+
+    R_xlen_t translated_bitmap_size = XTRUELENGTH(bitmap);
     SEXP translated_bitmap = bitmap_new(XLENGTH(source));
 
     R_xlen_t viewport_index = 0;
     R_xlen_t indices_index = 0;
 
     for (R_xlen_t i = 0; i < translated_bitmap_size; i++) {
-        R_xlen_t index = (R_xlen_t) REAL_ELT(indices, indices_index);
-        if (bitmap_get(bitmap, i)) {
-            if (viewport_index == index) {
+    	if (bitmap_get(bitmap, i)) {
+        	R_xlen_t index = (R_xlen_t) TYPEOF(indices) == REALSXP ? REAL_ELT(indices, indices_index)
+        														   : INTEGER_ELT(indices, indices_index);
+
+            if (viewport_index == index - 1) {
                 bitmap_set(translated_bitmap, i);
                 indices_index++;
             }

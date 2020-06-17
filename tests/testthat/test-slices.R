@@ -57,19 +57,19 @@ test_that("region partially out of range", {
 test_that("subset contiguous monotonic", {
     source <- 1:100
     viewport <- slice(source, 10, 10)
-    expect_equal(viewport[2:4], as.integer(c(11, 12, 13)))
+    expect_equal(viewport[2:4], source[10:19][2:4])
 })
 
 test_that("subset non-contiguous monotonic", {
     source <- 1:100
     viewport <- slice(source, 10, 10)
-    expect_equal(viewport[c(1,3,5)], as.integer(c(10, 12, 14)))
+    expect_equal(viewport[c(1,3,5)], source[10:19][c(1,3,5)])
 })
 
 test_that("subset non-contiguous non-monotonic", {
     source <- 1:100
     viewport <- slice(source, 10, 10)
-    expect_equal(viewport[c(1,5,3)], as.integer(c(10, 14, 12)))
+    expect_equal(viewport[c(1,5,3)], source[10:19][c(1,5,3)])
 })
 
 test_that("integer test", {
@@ -136,3 +136,39 @@ test_that("raw test", {
     expect_equal(viewport[3], as.raw(06))
     expect_equal(viewport[4], as.raw(07))
 })
+
+test_that("sum integer test", {
+	source <- as.integer(1:100)
+    viewport <- slice(source, 10, 10)
+    
+    expect_equal(sum(viewport), sum(source[10:19]))
+})
+
+test_that("sum numeric test", {
+	source <- as.numeric(1:100)
+    viewport <- slice(source, 10, 10)
+    
+    expect_equal(sum(viewport), sum(source[10:19]))
+})
+
+test_that("sum boolean test", {
+	source <- rep(c(T,F), 100)
+    viewport <- slice(source, 10, 10)
+    
+    expect_equal(sum(viewport), sum(source[10:19]))
+})
+
+# test_that("sum raw test", {
+# 	source <- as.raw(1:100)
+#     viewport <- slice(source, 10, 10)
+#     
+#     expect_equal(sum(viewport), sum(source[10:19]))
+# })
+
+test_that("sum complex test", {
+	source <- as.complex(1:100)
+    viewport <- slice(source, 10, 10)
+    
+    expect_equal(sum(viewport), sum(source[10:19]))
+})
+
